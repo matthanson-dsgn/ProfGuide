@@ -182,8 +182,9 @@ end
 
 -- Notes from the last scan, shown by /pg check to help fix problems.
 local function NewScanReport(api)
-    local report = { api = api, recipes = 0, matched = 0, saved = 0, examples = {} }
+    local report = { api = api, recipes = 0, matched = 0, saved = 0, examples = {}, time = time() }
     ProfGuideDB.lastScan = report
+    ns.scannedNames = {} -- every recipe name seen (this session only, not saved)
     return report
 end
 
@@ -208,6 +209,7 @@ local function ScanModern()
     for _, recipeID in ipairs(ids) do
         local info = T.GetRecipeInfo(recipeID)
         report.recipes = report.recipes + 1
+        if info and info.name then table.insert(ns.scannedNames, info.name) end
         if info and info.name and #report.examples < 3 then table.insert(report.examples, info.name) end
         if info and info.name and wanted[info.name] then
             report.matched = report.matched + 1
@@ -255,6 +257,7 @@ local function ScanClassic()
         local name, kind = GetTradeSkillInfo(i)
         if name and kind ~= "header" and kind ~= "subheader" then
             report.recipes = report.recipes + 1
+            table.insert(ns.scannedNames, name)
             if #report.examples < 3 then table.insert(report.examples, name) end
             if wanted[name] then
                 report.matched = report.matched + 1
@@ -458,6 +461,18 @@ local function Check()
     print("  Recipes confirmed from your profession window: " .. verified .. " of " .. #prof.steps)
     if #missing > 0 then
         print(grey .. "  Not confirmed (name may differ in game): " .. table.concat(missing, ", ") .. "|r")
+        -- Show game recipe names that contain the same words, to spot spelling differences.
+        if ns.scannedNames then
+            for _, recipe in ipairs(missing) do
+                local needle, hits = recipe:lower(), {}
+                for _, n in ipairs(ns.scannedNames) do
+                    if n:lower():find(needle, 1, true) and #hits < 5 then
+                        table.insert(hits, "\"" .. n .. "\"")
+                    end
+                end
+                print(grey .. "    In game for \"" .. recipe .. "\": " .. (#hits > 0 and table.concat(hits, ", ") or "no similar names") .. "|r")
+            end
+        end
     end
     if #differs > 0 then
         print(grey .. "  Different in game (the game's version is being used):|r")
@@ -478,7 +493,8 @@ local function Check()
     elseif scan.api == "none" then
         print(red .. "  Profession window: opened, but the add-on couldn't read it (please report).|r")
     else
-        print(grey .. "  Last window scan (" .. scan.api .. "): " .. scan.recipes .. " recipes seen, "
+        local age = scan.time and math.floor((time() - scan.time) / 60) or nil
+        print(grey .. "  Last window scan (" .. scan.api .. (age and (", " .. age .. " min ago") or "") .. "): " .. scan.recipes .. " recipes seen, "
             .. scan.matched .. " on a route, " .. scan.saved .. " saved.|r")
         if #scan.examples > 0 then
             print(grey .. "  e.g. " .. table.concat(scan.examples, ", ") .. "|r")
