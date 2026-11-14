@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: ProfGuide
+## Notes: In-game profession levelling guide with a live shopping list.
+## Author: Matt
+## Version: 0.1.0
+## SavedVariables: ProfGuideDB
+
+# Files load top to bottom, so data comes before the code that uses it.
+Data_Leatherworking.lua
+Core.lua
+UI.lua
