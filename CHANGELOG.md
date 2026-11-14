@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (14/11/2026)
+- Rank training reminders are hidden once you've already trained that rank.
+- Budget Leatherworking route checked in game: all 20 steps confirmed.
+
 ## 0.4.0 (14/11/2026)
 - New Fast / Budget route switch (Leatherworking for now).
 - Budget Leatherworking route: no elixirs or gems, and about 180 Heavy Scorpid Scales instead of about 420, for a similar number of crafts.

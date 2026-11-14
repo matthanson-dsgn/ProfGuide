@@ -432,7 +432,9 @@ end
 function ns.RankTips(prof, step, skill, maxSkill)
     local tips = {}
     for _, r in ipairs(RANKS) do
-        if step.from < r.cap and step.to >= r.cap then
+        -- Skip ranks you've already trained (your max skill is past the cap).
+        local alreadyTrained = maxSkill and maxSkill > r.cap
+        if step.from < r.cap and step.to >= r.cap and not alreadyTrained then
             local text = (prof.rankNotes and prof.rankNotes[r.cap]) or r.text
             table.insert(tips, "Skill stops at " .. r.cap .. ". " .. text)
         end
