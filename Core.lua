@@ -178,9 +178,20 @@ local function RouteRecipeNames()
     return set
 end
 
-local function ScanTradeSkill()
+-- Notes from the last scan, shown by /pg check to help fix problems.
+local function NewScanReport(api)
+    local report = { api = api, recipes = 0, matched = 0, saved = 0, examples = {} }
+    ProfGuideDB.lastScan = report
+    return report
+end
+
+-- Modern (retail-style) profession window.
+local function ScanModern()
     local T = C_TradeSkillUI
-    if not (T and T.GetAllRecipeIDs and T.GetRecipeInfo and T.GetRecipeSchematic) then return end
+    if not (T and T.GetAllRecipeIDs and T.GetRecipeInfo and T.GetRecipeSchematic) then return false end
+    local ids = T.GetAllRecipeIDs() or {}
+    if #ids == 0 then return false end -- no window open, or not this kind of window
+    local report = NewScanReport("modern")
 
     -- Your skill in the open profession.
     if T.GetBaseProfessionInfo then
@@ -192,9 +203,12 @@ local function ScanTradeSkill()
 
     local wanted = RouteRecipeNames()
     local basicType = Enum and Enum.CraftingReagentType and Enum.CraftingReagentType.Basic
-    for _, recipeID in ipairs(T.GetAllRecipeIDs() or {}) do
+    for _, recipeID in ipairs(ids) do
         local info = T.GetRecipeInfo(recipeID)
+        report.recipes = report.recipes + 1
+        if info and info.name and #report.examples < 3 then table.insert(report.examples, info.name) end
         if info and info.name and wanted[info.name] then
+            report.matched = report.matched + 1
             local schematic = T.GetRecipeSchematic(recipeID, false)
             local mats, complete = {}, true
             for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
@@ -211,7 +225,64 @@ local function ScanTradeSkill()
                     end
                 end
             end
-            if complete and #mats > 0 then ProfGuideDB.recipes[info.name] = mats end
+            if complete and #mats > 0 then
+                ProfGuideDB.recipes[info.name] = mats
+                report.saved = report.saved + 1
+            end
+        end
+    end
+    return true
+end
+
+-- Older (Classic-style) profession window, in case Forever uses it.
+local function ScanClassic()
+    if not (GetNumTradeSkills and GetTradeSkillInfo and GetTradeSkillNumReagents and GetTradeSkillReagentInfo) then
+        return false
+    end
+    local count = GetNumTradeSkills() or 0
+    if count == 0 then return false end
+    local report = NewScanReport("classic")
+
+    if GetTradeSkillLine then
+        local name, rank, maxRank = GetTradeSkillLine()
+        RememberSkill(name, rank, maxRank)
+    end
+
+    local wanted = RouteRecipeNames()
+    for i = 1, count do
+        local name, kind = GetTradeSkillInfo(i)
+        if name and kind ~= "header" and kind ~= "subheader" then
+            report.recipes = report.recipes + 1
+            if #report.examples < 3 then table.insert(report.examples, name) end
+            if wanted[name] then
+                report.matched = report.matched + 1
+                local mats, complete = {}, true
+                for j = 1, (GetTradeSkillNumReagents(i) or 0) do
+                    local reagentName, _, amount = GetTradeSkillReagentInfo(i, j)
+                    if reagentName then
+                        table.insert(mats, { reagentName, amount or 1 })
+                        -- Learn the item ID from its link, e.g. "|Hitem:2318:..."
+                        local link = GetTradeSkillReagentItemLink and GetTradeSkillReagentItemLink(i, j)
+                        local id = link and tonumber(link:match("item:(%d+)"))
+                        if id then ProfGuideDB.itemIDs[reagentName] = id end
+                    else
+                        complete = false -- not loaded yet; next scan will get it
+                    end
+                end
+                if complete and #mats > 0 then
+                    ProfGuideDB.recipes[name] = mats
+                    report.saved = report.saved + 1
+                end
+            end
+        end
+    end
+    return true
+end
+
+local function ScanTradeSkill()
+    if not ScanModern() then
+        if not ScanClassic() then
+            ProfGuideDB.lastScan = { api = "none" }
         end
     end
 end
@@ -368,6 +439,20 @@ local function Check()
     if #wrong > 0 then
         print(red .. "  Wrong starter IDs (ignored, please report): " .. table.concat(wrong, "; ") .. "|r")
     end
+
+    -- What happened the last time a profession window was opened.
+    local scan = ProfGuideDB.lastScan
+    if not scan then
+        print(grey .. "  Profession window: not opened since the add-on was updated. Open it, then run /pg check again.|r")
+    elseif scan.api == "none" then
+        print(red .. "  Profession window: opened, but the add-on couldn't read it (please report).|r")
+    else
+        print(grey .. "  Last window scan (" .. scan.api .. "): " .. scan.recipes .. " recipes seen, "
+            .. scan.matched .. " on a route, " .. scan.saved .. " saved.|r")
+        if #scan.examples > 0 then
+            print(grey .. "  e.g. " .. table.concat(scan.examples, ", ") .. "|r")
+        end
+    end
 end
 
 -- ---------- Events ----------
@@ -377,7 +462,8 @@ end
 local events = CreateFrame("Frame")
 for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL",
                      "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED", "TRADE_SKILL_SHOW",
-                     "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED" }) do
+                     "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED",
+                     "TRADE_SKILL_UPDATE" }) do
     events:RegisterEvent(e)
 end
 
