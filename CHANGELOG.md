@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 (14/11/2026)
+- Fix: after switching characters, the profession list could show the previous character's skills. Saved skill numbers are cleared once and refill as you play.
+- Per-character data is only saved once the character's name is known.
+
 ## 0.5.0 (14/11/2026)
 - "Not learned yet" label on steps whose recipe this character hasn't learned (read from your profession window).
 - Nearest trainer: steps that need a trainer or a new rank show the closest one for your faction and rank. Click it to open the map; hover to see the next closest.

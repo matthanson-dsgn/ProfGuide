@@ -87,28 +87,45 @@ local function InitDB()
     if db.shown == nil then db.shown = true end
     db.itemIDs = db.itemIDs or {}   -- item name -> ID, learned in game
     db.recipes = db.recipes or {}   -- recipe name -> materials, read from profession windows
+    -- Skill numbers saved before 0.5.1 could belong to another character,
+    -- so clear them once. They refill on login or when you open a profession.
+    if db.skillsVersion ~= 2 then
+        db.skills = {}
+        db.skillsVersion = 2
+    end
     db.skills  = db.skills or {}    -- character -> profession -> { skill, max }
     db.routes  = db.routes or {}    -- profession -> "fast" or "budget"
     db.known   = db.known or {}     -- character -> recipe name -> learned? (true/false)
-    db.known[CharKey()] = db.known[CharKey()] or {}
-    db.skills[CharKey()] = db.skills[CharKey()] or {}
+end
+
+-- This character's part of a saved table (e.g. "skills"), created on demand.
+-- Returns nil until the character's name is known, so nothing is ever
+-- saved under a shared "unknown" character.
+local function CharTable(field)
+    local name = UnitName("player")
+    if not (ProfGuideForeverDB and name and name ~= UNKNOWNOBJECT) then return nil end
+    local key = CharKey()
+    ProfGuideForeverDB[field][key] = ProfGuideForeverDB[field][key] or {}
+    return ProfGuideForeverDB[field][key]
 end
 
 local function RememberSkill(name, rank, maxRank)
-    if ProfGuideForeverDB and name and rank and maxRank and maxRank > 0 then
-        ProfGuideForeverDB.skills[CharKey()][name] = { rank, maxRank }
+    local skills = CharTable("skills")
+    if skills and name and rank and maxRank and maxRank > 0 then
+        skills[name] = { rank, maxRank }
     end
 end
 
 -- Has this character learned a recipe? true / false, or nil if we
 -- haven't seen it in a profession window yet.
 function ns.IsKnown(recipe)
-    local known = ProfGuideForeverDB and ProfGuideForeverDB.known[CharKey()]
+    local known = CharTable("known")
     if known then return known[recipe] end
 end
 
 -- ---------- Reading your skill ----------
--- Tries three ways, because Forever's API may differ from retail's.
+-- Tries two ways: your professions list, then this character's own
+-- profession window from last time.
 
 function ns.GetSkill(prof)
     -- 1. The standard professions list (works for most professions).
@@ -126,17 +143,13 @@ function ns.GetSkill(prof)
         end
     end
 
-    -- 2. Ask by skill line ID (newer API). pcall = "try it safely".
-    if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoBySkillLineID then
-        local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoBySkillLineID, prof.skillLine)
-        if ok and info and info.maxSkillLevel and info.maxSkillLevel > 0 then
-            RememberSkill(prof.name, info.skillLevel, info.maxSkillLevel)
-            return info.skillLevel, info.maxSkillLevel
-        end
-    end
-
-    -- 3. Whatever we saw last time this character opened the profession.
-    local saved = ProfGuideForeverDB and ProfGuideForeverDB.skills[CharKey()][prof.name]
+    -- 2. What this character's own profession window told us last time
+    --    (covers professions the list above leaves out, like First Aid).
+    -- Note: we don't ask the game by skill line ID any more. After a
+    -- character switch it could still answer with the previous
+    -- character's skill.
+    local skills = CharTable("skills")
+    local saved = skills and skills[prof.name]
     if saved then return saved[1], saved[2] end
     return nil
 end
@@ -255,7 +268,8 @@ local function ScanModern()
         if info and info.name and #report.examples < 3 then table.insert(report.examples, info.name) end
         if info and info.name and wanted[info.name] then
             report.matched = report.matched + 1
-            ProfGuideForeverDB.known[CharKey()][info.name] = info.learned and true or false
+            local known = CharTable("known")
+            if known then known[info.name] = info.learned and true or false end
             local schematic = T.GetRecipeSchematic(recipeID, false)
             local mats, complete = {}, true
             for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
@@ -304,7 +318,8 @@ local function ScanClassic()
             if #report.examples < 3 then table.insert(report.examples, name) end
             if wanted[name] then
                 report.matched = report.matched + 1
-                ProfGuideForeverDB.known[CharKey()][name] = true -- this window only lists learned recipes
+                local known = CharTable("known")
+                if known then known[name] = true end -- this window only lists learned recipes
                 local mats, complete = {}, true
                 for j = 1, (GetTradeSkillNumReagents(i) or 0) do
                     local reagentName, _, amount = GetTradeSkillReagentInfo(i, j)
