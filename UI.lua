@@ -275,6 +275,30 @@ function UI:Build()
     self.recipe  = NewText(f, "GameFontHighlightLarge")
     self.meta    = NewText(f, "GameFontHighlightSmall")
     self.note    = NewText(f, "GameFontNormalSmall") -- gold, reads as a tip
+
+    -- "Nearest trainer" line: click to open the map, hover for more.
+    local tb = CreateFrame("Button", nil, f)
+    tb:SetSize(INNER_W, 16)
+    tb.text = NewText(tb, "GameFontHighlightSmall")
+    tb.text:SetPoint("TOPLEFT")
+    tb.text:SetWidth(INNER_W)
+    tb:SetScript("OnClick", function(btn) ns.Finder.OpenMap(btn.trainers and btn.trainers[1]) end)
+    tb:SetScript("OnEnter", function(btn)
+        btn.text:SetAlpha(0.75) -- hover feedback
+        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Nearest trainers", 1, 0.82, 0)
+        for _, e in ipairs(btn.trainers or {}) do
+            GameTooltip:AddDoubleLine(e.name, ns.Finder.DistanceText(e), 1, 1, 1, 0.62, 0.62, 0.62)
+            GameTooltip:AddLine("   " .. e.zone .. ", " .. e.where, 0.62, 0.62, 0.62)
+        end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Click to open the map.", 1, 1, 1)
+        GameTooltip:AddLine("City guards will mark any trainer on your map.", 0.62, 0.62, 0.62, true)
+        GameTooltip:Show()
+    end)
+    tb:SetScript("OnLeave", function(btn) btn.text:SetAlpha(1); GameTooltip:Hide() end)
+    tb:Hide()
+    self.trainerBtn = tb
     -- Materials box: faint fill + 1px border so it reads as its own card.
     local box = CreateFrame("Frame", nil, f, "BackdropTemplate")
     box:SetWidth(INNER_W)
@@ -538,16 +562,49 @@ function UI:Draw()
 
         Place(self.meta, y)
         local meta = "Make about " .. crafts .. ".  Learn from: " .. step.source
-        if verified then meta = meta .. "\n|cff66d977Materials checked in game|r" end
+        -- Second line: status labels (only the ones that apply).
+        local known = ns.IsKnown(step.recipe)
+        local status = {}
+        if known == false then table.insert(status, "|cffff9933Not learned yet|r") end
+        if verified then table.insert(status, "|cff66d977Materials checked in game|r") end
+        if #status > 0 then meta = meta .. "\n" .. table.concat(status, "    ") end
         self.meta:SetText(meta)
         self.meta:SetTextColor(unpack(COLOR_MUTED))
-        y = y - self.meta:GetStringHeight() - GAP_BELOW_RECIPE
+        y = y - self.meta:GetStringHeight()
+
+        -- Nearest trainer: when you haven't learned the profession, the
+        -- recipe, or you need to train your next rank.
+        local rankTips, capped = ns.RankTips(prof, step, skill, maxSkill)
+        local isCurrent = (index == current)
+        local needRank = isCurrent and (capped or #rankTips > 0)
+        local needRecipe = (known == false and step.source == "Trainer")
+        local trainers = {}
+        if (skill == nil or needRank or needRecipe) and ns.Finder then
+            local need = ns.Finder.NeedSkill(skill, maxSkill)
+            if needRank and maxSkill and maxSkill < 300 then need = maxSkill + 75 end
+            trainers = ns.Finder.Nearest(prof.name, need, 3)
+        end
+        if #trainers > 0 then
+            local e = trainers[1]
+            local dist = ns.Finder.DistanceText(e)
+            self.trainerBtn.trainers = trainers
+            self.trainerBtn.text:SetText("|cffffd100Nearest trainer:|r " .. e.name .. ", " .. e.zone
+                .. (dist ~= "" and ("  |cff9d9d9d(" .. dist .. ")|r") or ""))
+            y = y - 6
+            self.trainerBtn:ClearAllPoints()
+            self.trainerBtn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", PAD, y)
+            self.trainerBtn:SetHeight(self.trainerBtn.text:GetStringHeight())
+            self.trainerBtn:Show()
+            y = y - self.trainerBtn.text:GetStringHeight()
+        else
+            self.trainerBtn:Hide()
+        end
+        y = y - GAP_BELOW_RECIPE
 
         -- Tips: the step's own note, rank training reminders, and a
         -- warning if you've hit your skill cap.
         local lines = {}
         if step.note then table.insert(lines, "Tip: " .. step.note) end
-        local rankTips, capped = ns.RankTips(prof, step, skill, maxSkill)
         for _, t in ipairs(rankTips) do table.insert(lines, t) end
         if capped and index == current then
             table.insert(lines, "|cffff7a6bYou've hit your skill cap. Train the next rank to keep levelling.|r")
@@ -571,7 +628,7 @@ function UI:Draw()
     else
         local list = ns.ShoppingList(prof, skill)
 
-        self.eyebrow:Hide(); self.recipe:Hide(); self.meta:Hide(); self.note:Hide()
+        self.eyebrow:Hide(); self.recipe:Hide(); self.meta:Hide(); self.note:Hide(); self.trainerBtn:Hide()
 
         local label = (#list > 0) and "EVERYTHING TO GATHER OR BUY FROM HERE TO 300" or "NOTHING LEFT TO GET. NICE WORK!"
         -- Long lists get cut to the biggest items so the panel stays a sensible height.

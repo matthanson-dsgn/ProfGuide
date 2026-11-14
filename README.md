@@ -9,6 +9,7 @@ An in-game profession levelling guide for **World of Warcraft: Forever**. Stop t
 - Lets you browse ahead or back with Prev / Next.
 - You can drag the panel anywhere; it remembers its position.
 - A minimap button opens and closes the panel.
+- Shows which recipes you haven't learned yet, and your nearest trainer (click to open the map).
 
 ## Professions
 All crafting professions from 1 to 300: Alchemy, Blacksmithing, Enchanting, Engineering, Leatherworking and Tailoring, plus Cooking and First Aid.
@@ -29,6 +30,7 @@ Leatherworking has two routes. Switch between them with the **Fast | Budget** to
 |---|---|
 | `/pg` or `/pgf` | Show or hide the panel (`/pgf` always works, even if another add-on uses `/pg`) |
 | `/pg check` | Check the current profession's data against the game |
+| `/pg trainers` | List the nearest trainers for the current profession |
 | `/pg minimap` | Hide or show the minimap button |
 | `/pg reset` | Move the panel back to its starting position |
 | `Esc` | Close the panel |

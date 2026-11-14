@@ -89,6 +89,8 @@ local function InitDB()
     db.recipes = db.recipes or {}   -- recipe name -> materials, read from profession windows
     db.skills  = db.skills or {}    -- character -> profession -> { skill, max }
     db.routes  = db.routes or {}    -- profession -> "fast" or "budget"
+    db.known   = db.known or {}     -- character -> recipe name -> learned? (true/false)
+    db.known[CharKey()] = db.known[CharKey()] or {}
     db.skills[CharKey()] = db.skills[CharKey()] or {}
 end
 
@@ -96,6 +98,13 @@ local function RememberSkill(name, rank, maxRank)
     if ProfGuideForeverDB and name and rank and maxRank and maxRank > 0 then
         ProfGuideForeverDB.skills[CharKey()][name] = { rank, maxRank }
     end
+end
+
+-- Has this character learned a recipe? true / false, or nil if we
+-- haven't seen it in a profession window yet.
+function ns.IsKnown(recipe)
+    local known = ProfGuideForeverDB and ProfGuideForeverDB.known[CharKey()]
+    if known then return known[recipe] end
 end
 
 -- ---------- Reading your skill ----------
@@ -246,6 +255,7 @@ local function ScanModern()
         if info and info.name and #report.examples < 3 then table.insert(report.examples, info.name) end
         if info and info.name and wanted[info.name] then
             report.matched = report.matched + 1
+            ProfGuideForeverDB.known[CharKey()][info.name] = info.learned and true or false
             local schematic = T.GetRecipeSchematic(recipeID, false)
             local mats, complete = {}, true
             for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
@@ -294,6 +304,7 @@ local function ScanClassic()
             if #report.examples < 3 then table.insert(report.examples, name) end
             if wanted[name] then
                 report.matched = report.matched + 1
+                ProfGuideForeverDB.known[CharKey()][name] = true -- this window only lists learned recipes
                 local mats, complete = {}, true
                 for j = 1, (GetTradeSkillNumReagents(i) or 0) do
                     local reagentName, _, amount = GetTradeSkillReagentInfo(i, j)
@@ -602,6 +613,7 @@ end)
 -- /pg check    check the current profession's data against the game
 -- /pg reset    move the panel back to the middle-right of the screen
 -- /pg minimap  hide or show the minimap button
+-- /pg trainers list the nearest trainers for the current profession
 SLASH_PROFGUIDEFOREVER1 = "/pgf"
 SLASH_PROFGUIDEFOREVER2 = "/pg"
 SLASH_PROFGUIDEFOREVER3 = "/profguide"
@@ -609,6 +621,8 @@ SlashCmdList.PROFGUIDEFOREVER = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
     if msg == "check" then
         Check()
+    elseif msg == "trainers" or msg == "trainer" then
+        if ns.Finder then ns.Finder.PrintNearest() end
     elseif msg == "minimap" then
         if ns.Minimap then ns.Minimap:Toggle() end
     elseif msg == "reset" then

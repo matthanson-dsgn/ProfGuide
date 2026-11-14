@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 (14/11/2026)
+- "Not learned yet" label on steps whose recipe this character hasn't learned (read from your profession window).
+- Nearest trainer: steps that need a trainer or a new rank show the closest one for your faction and rank. Click it to open the map; hover to see the next closest.
+- `/pg trainers` lists the five nearest trainers in chat.
+- Trainer list for all eight professions, including Zephras Isle.
+
 ## 0.4.1 (14/11/2026)
 - Rank training reminders are hidden once you've already trained that rank.
 - Budget Leatherworking route checked in game: all 20 steps confirmed.
