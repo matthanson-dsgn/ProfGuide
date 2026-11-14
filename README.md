@@ -1,4 +1,4 @@
-# ProfGuide
+# ProfGuide Forever
 
 An in-game profession levelling guide for **World of Warcraft: Forever**. Stop tabbing out to read guides.
 
@@ -22,7 +22,7 @@ Pick a profession from the dropdown in the panel's header. Your character's prof
 ## Usage
 | Command | What it does |
 |---|---|
-| `/pg` or `/profguide` | Show or hide the panel |
+| `/pg` or `/pgf` | Show or hide the panel (`/pgf` always works, even if another add-on uses `/pg`) |
 | `/pg check` | Check the current profession's data against the game |
 | `/pg minimap` | Hide or show the minimap button |
 | `/pg reset` | Move the panel back to its starting position |
@@ -30,8 +30,8 @@ Pick a profession from the dropdown in the panel's header. Your character's prof
 
 ## Install
 1. Download the latest release.
-2. Unzip it into `World of Warcraft\_forever_\Interface\AddOns\`. You should end up with `AddOns\ProfGuide\ProfGuide.toc`.
-3. Restart the game and make sure ProfGuide is ticked in the AddOns list at character select.
+2. Unzip it into `World of Warcraft\_forever_\Interface\AddOns\`. You should end up with `AddOns\ProfGuideForever\ProfGuideForever.toc`.
+3. Restart the game and make sure ProfGuide Forever is ticked in the AddOns list at character select.
 
 ## Project structure
 | File | Role |

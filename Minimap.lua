@@ -10,12 +10,12 @@ local addonName, ns = ...
 local Btn = {}
 ns.Minimap = Btn
 
-local ICON = "Interface\\AddOns\\ProfGuide\\Media\\MinimapIcon"
+local ICON = "Interface\\AddOns\\ProfGuideForever\\Media\\MinimapIcon"
 
 -- Places the button on the minimap's edge at the saved angle
 -- (0 = right, 90 = top, 180 = left, 270 = bottom).
 local function UpdatePosition(button)
-    local angle = math.rad(ProfGuideDB.minimap.angle)
+    local angle = math.rad(ProfGuideForeverDB.minimap.angle)
     local radius = (Minimap:GetWidth() / 2) + 5
     button:ClearAllPoints()
     button:SetPoint("CENTER", Minimap, "CENTER", math.cos(angle) * radius, math.sin(angle) * radius)
@@ -23,9 +23,9 @@ end
 
 function Btn:Build()
     if self.button or not Minimap then return end
-    ProfGuideDB.minimap = ProfGuideDB.minimap or { angle = 225, hide = false } -- 225 = bottom-left
+    ProfGuideForeverDB.minimap = ProfGuideForeverDB.minimap or { angle = 225, hide = false } -- 225 = bottom-left
 
-    local b = CreateFrame("Button", "ProfGuideMinimapButton", Minimap)
+    local b = CreateFrame("Button", "ProfGuideForeverMinimapButton", Minimap)
     b:SetSize(31, 31)
     b:SetFrameStrata("MEDIUM")
     b:SetFrameLevel(8)
@@ -60,7 +60,7 @@ function Btn:Build()
 
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("ProfGuide", 1, 0.82, 0)
+        GameTooltip:AddLine("ProfGuide Forever", 1, 0.82, 0)
         GameTooltip:AddLine("Click to show or hide the guide.", 1, 1, 1)
         GameTooltip:AddLine("Drag to move this button.", 0.62, 0.62, 0.62)
         GameTooltip:Show()
@@ -75,7 +75,7 @@ function Btn:Build()
             local cx, cy = GetCursorPosition()
             local scale = Minimap:GetEffectiveScale()
             cx, cy = cx / scale, cy / scale
-            ProfGuideDB.minimap.angle = math.deg(math.atan2(cy - my, cx - mx))
+            ProfGuideForeverDB.minimap.angle = math.deg(math.atan2(cy - my, cx - mx))
             UpdatePosition(button)
         end)
     end)
@@ -83,19 +83,19 @@ function Btn:Build()
 
     self.button = b
     UpdatePosition(b)
-    b:SetShown(not ProfGuideDB.minimap.hide)
+    b:SetShown(not ProfGuideForeverDB.minimap.hide)
 end
 
 -- /pg minimap: hide or show the button.
 function Btn:Toggle()
     if not self.button then return end
-    ProfGuideDB.minimap.hide = not ProfGuideDB.minimap.hide
-    self.button:SetShown(not ProfGuideDB.minimap.hide)
-    print("|cffffd100ProfGuide:|r minimap button " .. (ProfGuideDB.minimap.hide and "hidden. Type /pg minimap to bring it back." or "shown."))
+    ProfGuideForeverDB.minimap.hide = not ProfGuideForeverDB.minimap.hide
+    self.button:SetShown(not ProfGuideForeverDB.minimap.hide)
+    print("|cffffd100ProfGuide Forever:|r minimap button " .. (ProfGuideForeverDB.minimap.hide and "hidden. Type /pg minimap to bring it back." or "shown."))
 end
 
 -- Clicking ProfGuide in the minimap's add-on menu (newer clients
 -- have one; the .toc file points here). Global so the game can find it.
-function ProfGuide_OnAddonCompartmentClick()
+function ProfGuideForever_OnAddonCompartmentClick()
     if ns.UI then ns.UI:Toggle() end
 end

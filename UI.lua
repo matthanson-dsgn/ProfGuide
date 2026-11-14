@@ -161,7 +161,7 @@ function UI:Build()
     if self.frame then return end
     self.rows = {}
 
-    local f = CreateFrame("Frame", "ProfGuideFrame", UIParent, "BackdropTemplate")
+    local f = CreateFrame("Frame", "ProfGuideForeverFrame", UIParent, "BackdropTemplate")
     self.frame = f
     f:SetSize(WIDTH, 300)
     f:SetFrameStrata("MEDIUM")
@@ -184,9 +184,9 @@ function UI:Build()
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
         local point, _, relPoint, x, y = frame:GetPoint()
-        ProfGuideDB.pos = { point, relPoint, x, y }
+        ProfGuideForeverDB.pos = { point, relPoint, x, y }
     end)
-    local pos = ProfGuideDB.pos
+    local pos = ProfGuideForeverDB.pos
     if pos then
         f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
     else
@@ -194,7 +194,7 @@ function UI:Build()
     end
 
     -- Esc closes the panel, like other game windows.
-    tinsert(UISpecialFrames, "ProfGuideFrame")
+    tinsert(UISpecialFrames, "ProfGuideForeverFrame")
 
     -- Header: profession picker. Icon + name + down arrow, as one button.
     local picker = CreateFrame("Button", nil, f)
@@ -318,7 +318,7 @@ function UI:Build()
     self.currentBtn:SetPoint("BOTTOM", 0, PAD)
 
     f:HookScript("OnHide", function() UI.menu:Hide() end)
-    f:SetShown(ProfGuideDB.shown)
+    f:SetShown(ProfGuideForeverDB.shown)
     self:Refresh()
 end
 
@@ -363,7 +363,7 @@ local function MenuItem(self, i)
     b:SetScript("OnClick", function(btn)
         ns.state.prof = btn.profName
         ns.state.viewIndex = nil
-        ProfGuideDB.lastProf = btn.profName
+        ProfGuideForeverDB.lastProf = btn.profName
         UI.menu:Hide()
         UI:Refresh()
     end)
@@ -435,7 +435,7 @@ function UI:Refresh()
     local ok, err = pcall(self.Draw, self)
     if not ok and err ~= lastError then
         lastError = err
-        print("|cffff5555ProfGuide error:|r " .. tostring(err))
+        print("|cffff5555ProfGuide Forever error:|r " .. tostring(err))
     end
 end
 
@@ -548,6 +548,6 @@ function UI:Toggle(show)
     if not self.frame then self:Build() end
     if show == nil then show = not self.frame:IsShown() end
     self.frame:SetShown(show)
-    ProfGuideDB.shown = show
+    ProfGuideForeverDB.shown = show
     if show then self:Refresh() end
 end

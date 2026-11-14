@@ -1,11 +1,11 @@
 ## Interface: 16001
-## Title: ProfGuide
+## Title: ProfGuide Forever
 ## Notes: In-game profession levelling guide with a live shopping list.
 ## Author: Matt
-## Version: 0.3.1
-## SavedVariables: ProfGuideDB
-## IconTexture: Interface\AddOns\ProfGuide\Media\MinimapIcon
-## AddonCompartmentFunc: ProfGuide_OnAddonCompartmentClick
+## Version: 0.3.2
+## SavedVariables: ProfGuideForeverDB
+## IconTexture: Interface\AddOns\ProfGuideForever\Media\MinimapIcon
+## AddonCompartmentFunc: ProfGuideForever_OnAddonCompartmentClick
 
 # Files load top to bottom. Core first, so the Data files can register.
 Core.lua

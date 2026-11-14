@@ -50,8 +50,8 @@ local function CharKey()
 end
 
 local function InitDB()
-    ProfGuideDB = ProfGuideDB or {}
-    local db = ProfGuideDB
+    ProfGuideForeverDB = ProfGuideForeverDB or {}
+    local db = ProfGuideForeverDB
     if db.shown == nil then db.shown = true end
     db.itemIDs = db.itemIDs or {}   -- item name -> ID, learned in game
     db.recipes = db.recipes or {}   -- recipe name -> materials, read from profession windows
@@ -60,8 +60,8 @@ local function InitDB()
 end
 
 local function RememberSkill(name, rank, maxRank)
-    if ProfGuideDB and name and rank and maxRank and maxRank > 0 then
-        ProfGuideDB.skills[CharKey()][name] = { rank, maxRank }
+    if ProfGuideForeverDB and name and rank and maxRank and maxRank > 0 then
+        ProfGuideForeverDB.skills[CharKey()][name] = { rank, maxRank }
     end
 end
 
@@ -94,7 +94,7 @@ function ns.GetSkill(prof)
     end
 
     -- 3. Whatever we saw last time this character opened the profession.
-    local saved = ProfGuideDB and ProfGuideDB.skills[CharKey()][prof.name]
+    local saved = ProfGuideForeverDB and ProfGuideForeverDB.skills[CharKey()][prof.name]
     if saved then return saved[1], saved[2] end
     return nil
 end
@@ -114,7 +114,7 @@ end
 -- Finds an item's ID: one learned in game first, then the starter
 -- list (only if the game agrees that ID has this name).
 function ns.ItemID(name)
-    local learned = ProfGuideDB and ProfGuideDB.itemIDs[name]
+    local learned = ProfGuideForeverDB and ProfGuideForeverDB.itemIDs[name]
     if learned then return learned end
     local seed = ns.SeedIDs and ns.SeedIDs[name]
     if seed and C_Item and C_Item.GetItemNameByID then
@@ -159,7 +159,7 @@ local function ScanBags()
                 local name = (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(info.itemID))
                     or (info.hyperlink and info.hyperlink:match("%[(.-)%]"))
                 if name then
-                    ProfGuideDB.itemIDs[name] = info.itemID
+                    ProfGuideForeverDB.itemIDs[name] = info.itemID
                     ns.bagCounts[name] = (ns.bagCounts[name] or 0) + (info.stackCount or 1)
                 end
             end
@@ -183,7 +183,7 @@ end
 -- Notes from the last scan, shown by /pg check to help fix problems.
 local function NewScanReport(api)
     local report = { api = api, recipes = 0, matched = 0, saved = 0, examples = {}, time = time() }
-    ProfGuideDB.lastScan = report
+    ProfGuideForeverDB.lastScan = report
     ns.scannedNames = {} -- every recipe name seen (this session only, not saved)
     return report
 end
@@ -221,7 +221,7 @@ local function ScanModern()
                 if isBasic and reagent and reagent.itemID then
                     local name = C_Item.GetItemNameByID(reagent.itemID)
                     if name then
-                        ProfGuideDB.itemIDs[name] = reagent.itemID
+                        ProfGuideForeverDB.itemIDs[name] = reagent.itemID
                         table.insert(mats, { name, slot.quantityRequired or 1 })
                     else
                         complete = false -- item not loaded yet; we'll catch it next scan
@@ -230,7 +230,7 @@ local function ScanModern()
                 end
             end
             if complete and #mats > 0 then
-                ProfGuideDB.recipes[info.name] = mats
+                ProfGuideForeverDB.recipes[info.name] = mats
                 report.saved = report.saved + 1
             end
         end
@@ -269,13 +269,13 @@ local function ScanClassic()
                         -- Learn the item ID from its link, e.g. "|Hitem:2318:..."
                         local link = GetTradeSkillReagentItemLink and GetTradeSkillReagentItemLink(i, j)
                         local id = link and tonumber(link:match("item:(%d+)"))
-                        if id then ProfGuideDB.itemIDs[reagentName] = id end
+                        if id then ProfGuideForeverDB.itemIDs[reagentName] = id end
                     else
                         complete = false -- not loaded yet; next scan will get it
                     end
                 end
                 if complete and #mats > 0 then
-                    ProfGuideDB.recipes[name] = mats
+                    ProfGuideForeverDB.recipes[name] = mats
                     report.saved = report.saved + 1
                 end
             end
@@ -287,7 +287,7 @@ end
 local function ScanTradeSkill()
     if not ScanModern() then
         if not ScanClassic() then
-            ProfGuideDB.lastScan = { api = "none" }
+            ProfGuideForeverDB.lastScan = { api = "none" }
         end
     end
 end
@@ -313,7 +313,7 @@ end
 -- A step's materials: from your profession window if we've seen it,
 -- otherwise from our data. Returns the list and whether it's verified.
 function ns.RecipeMats(step)
-    local scanned = ProfGuideDB and ProfGuideDB.recipes[step.recipe]
+    local scanned = ProfGuideForeverDB and ProfGuideForeverDB.recipes[step.recipe]
     if scanned then return scanned, true end
     return step.mats, false
 end
@@ -433,7 +433,7 @@ local function Check()
     -- recipes have different materials in game than in our data.
     local verified, missing, differs, listed = 0, {}, {}, {}
     for _, step in ipairs(prof.steps) do
-        local scanned = ProfGuideDB.recipes[step.recipe]
+        local scanned = ProfGuideForeverDB.recipes[step.recipe]
         if scanned then
             verified = verified + 1
             local same = (#scanned == #step.mats)
@@ -457,7 +457,7 @@ local function Check()
     end
 
     local gold, grey, red = "|cffffd100", "|cff9d9d9d", "|cffff5555"
-    print(gold .. "ProfGuide check: " .. prof.name .. "|r")
+    print(gold .. "ProfGuide Forever check: " .. prof.name .. "|r")
     print("  Recipes confirmed from your profession window: " .. verified .. " of " .. #prof.steps)
     if #missing > 0 then
         print(grey .. "  Not confirmed (name may differ in game): " .. table.concat(missing, ", ") .. "|r")
@@ -487,7 +487,7 @@ local function Check()
     end
 
     -- What happened the last time a profession window was opened.
-    local scan = ProfGuideDB.lastScan
+    local scan = ProfGuideForeverDB.lastScan
     if not scan then
         print(grey .. "  Profession window: not opened since the add-on was updated. Open it, then run /pg check again.|r")
     elseif scan.api == "none" then
@@ -524,7 +524,7 @@ local function QueueTradeSkillScan()
     C_Timer.After(0.5, function()
         scanQueued = false
         local ok, err = pcall(ScanTradeSkill)
-        if not ok then print("|cffff5555ProfGuide scan error:|r " .. tostring(err)) end
+        if not ok then print("|cffff5555ProfGuide Forever scan error:|r " .. tostring(err)) end
         if ns.UI then ns.UI:Refresh() end
     end)
 end
@@ -538,7 +538,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
         pcall(ScanBags)
         -- Open on the profession you last viewed, or your first one.
-        local last = ProfGuideDB.lastProf
+        local last = ProfGuideForeverDB.lastProf
         if last and ns.Professions[last] then
             ns.state.prof = last
         else
@@ -563,20 +563,21 @@ events:SetScript("OnEvent", function(self, event, arg1)
 end)
 
 -- ---------- Slash commands ----------
--- /pg          show or hide the panel
+-- /pg or /pgf  show or hide the panel (/pgf works even if another add-on uses /pg)
 -- /pg check    check the current profession's data against the game
 -- /pg reset    move the panel back to the middle-right of the screen
 -- /pg minimap  hide or show the minimap button
-SLASH_PROFGUIDE1 = "/profguide"
-SLASH_PROFGUIDE2 = "/pg"
-SlashCmdList.PROFGUIDE = function(msg)
+SLASH_PROFGUIDEFOREVER1 = "/pgf"
+SLASH_PROFGUIDEFOREVER2 = "/pg"
+SLASH_PROFGUIDEFOREVER3 = "/profguide"
+SlashCmdList.PROFGUIDEFOREVER = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
     if msg == "check" then
         Check()
     elseif msg == "minimap" then
         if ns.Minimap then ns.Minimap:Toggle() end
     elseif msg == "reset" then
-        ProfGuideDB.pos = nil
+        ProfGuideForeverDB.pos = nil
         if ns.UI and ns.UI.frame then
             ns.UI.frame:ClearAllPoints()
             ns.UI.frame:SetPoint("RIGHT", UIParent, "RIGHT", -80, 0)

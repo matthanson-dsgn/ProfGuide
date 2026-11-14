@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 (14/11/2026)
+- Renamed to ProfGuide Forever (folder: `ProfGuideForever`). Saved settings start fresh once.
+- Added `/pgf` as a slash command that won't clash with other add-ons.
+
 ## 0.3.1 (14/11/2026)
 - Reads both modern and Classic-style profession windows.
 - `/pg check` now shows unconfirmed recipes, recipes whose materials differ in game, and when the last scan ran.
