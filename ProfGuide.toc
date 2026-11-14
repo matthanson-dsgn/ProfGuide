@@ -2,10 +2,18 @@
 ## Title: ProfGuide
 ## Notes: In-game profession levelling guide with a live shopping list.
 ## Author: Matt
-## Version: 0.1.0
+## Version: 0.2.0
 ## SavedVariables: ProfGuideDB
 
-# Files load top to bottom, so data comes before the code that uses it.
-Data_Leatherworking.lua
+# Files load top to bottom. Core first, so the Data files can register.
 Core.lua
+Data\ItemIDs.lua
+Data\Alchemy.lua
+Data\Blacksmithing.lua
+Data\Enchanting.lua
+Data\Engineering.lua
+Data\Leatherworking.lua
+Data\Tailoring.lua
+Data\Cooking.lua
+Data\FirstAid.lua
 UI.lua

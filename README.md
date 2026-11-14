@@ -10,14 +10,20 @@ An in-game profession levelling guide for **World of Warcraft: Forever**. Stop t
 - You can drag the panel anywhere; it remembers its position.
 
 ## Professions
-- Leatherworking (1–300)
+All crafting professions from 1 to 300: Alchemy, Blacksmithing, Enchanting, Engineering, Leatherworking and Tailoring, plus Cooking and First Aid.
 
-More professions are coming.
+Pick a profession from the dropdown in the panel's header. Your character's professions are listed first.
+
+## Self-correcting data
+- Items are recognised **by name**. Their IDs are learned from your bags and profession windows.
+- When you open a profession window, ProfGuide reads the real materials for every recipe on the route and uses them from then on. Steps checked this way show "Materials checked in game".
 
 ## Usage
 | Command | What it does |
 |---|---|
 | `/pg` or `/profguide` | Show or hide the panel |
+| `/pg check` | Check the current profession's data against the game |
+| `/pg reset` | Move the panel back to its starting position |
 | `Esc` | Close the panel |
 
 ## Install
@@ -28,8 +34,9 @@ More professions are coming.
 ## Project structure
 | File | Role |
 |---|---|
-| `Data_Leatherworking.lua` | The levelling route (content only) |
-| `Core.lua` | Reads your skill and bags, and works out what you need |
+| `Data/*.lua` | One levelling route per profession (content only) |
+| `Data/ItemIDs.lua` | Starter item IDs (hints; verified in game) |
+| `Core.lua` | Reads your skill and bags, learns items, and works out what you need |
 | `UI.lua` | The panel |
 
 ## Licence

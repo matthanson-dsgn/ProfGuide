@@ -28,7 +28,7 @@ local COLOR_SHORT = { 1.00, 0.50, 0.45 } -- still need more
 local COLOR_MUTED = { 0.62, 0.62, 0.62 }
 local COLOR_BAR   = { 0.80, 0.52, 0.22 } -- leather brown-orange
 
-local function Prof() return ns.Professions[ns.activeProfession] end
+local function Prof() return ns.ActiveProf() end
 
 -- Puts a text element at a vertical position, full width,
 -- so long text wraps instead of running off the panel.
@@ -75,11 +75,10 @@ function UI:GetRow(i)
     r.name:SetPoint("LEFT", r.icon, "RIGHT", 8, 0)
     r.name:SetWordWrap(false) -- width is set per row in FillBox, so the badge can hug the text
 
-    -- "You make this" badge: a tiny leatherworking icon after the name.
+    -- "You make this" badge: a tiny profession icon after the name.
     r.badge = r:CreateTexture(nil, "OVERLAY")
     r.badge:SetSize(12, 12)
     r.badge:SetPoint("LEFT", r.name, "RIGHT", 5, 0)
-    r.badge:SetTexture("Interface\\Icons\\Trade_LeatherWorking")
     r.badge:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     -- Hover anywhere on the row to see the item tooltip.
@@ -87,10 +86,16 @@ function UI:GetRow(i)
     r:EnableMouse(true)
     r:SetScript("OnEnter", function(row)
         GameTooltip:SetOwner(row, "ANCHOR_LEFT")
-        GameTooltip:SetItemByID(row.itemID)
+        local id = ns.ItemID(row.itemName)
+        if id then
+            GameTooltip:SetItemByID(id)
+        else
+            GameTooltip:SetText(row.itemName)
+            GameTooltip:AddLine("Carry one or open your profession window so the add-on can recognise it.", 0.62, 0.62, 0.62, true)
+        end
         if row.crafted then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("You craft this in an earlier step.", 1, 0.82, 0)
+            GameTooltip:AddLine(row.craftedText, 1, 0.82, 0, true)
         end
         GameTooltip:Show()
     end)
@@ -101,8 +106,9 @@ function UI:GetRow(i)
 end
 
 -- Draws the materials box at position y: a small label, then one
--- row per { id, need, have }. Returns the y position under the box.
-function UI:FillBox(label, list, y)
+-- row per { name, need, have, crafted }. Returns the y under the box.
+-- craftedText = tooltip line for things you make yourself.
+function UI:FillBox(label, list, y, craftedText)
     local prof = Prof()
     local box = self.box
     box:ClearAllPoints()
@@ -116,14 +122,14 @@ function UI:FillBox(label, list, y)
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, rowsTop - (i - 1) * ROW_H)
 
-        local info = prof.items[m.id]
-        local name = info and info.name or ("Item " .. m.id)
-        local crafted = (info and info.crafted) or false
+        local name, crafted = m.name, m.crafted
 
         local ok = m.have >= m.need
-        r.itemID = m.id
+        r.itemName = name
         r.crafted = crafted
-        r.icon:SetTexture(ns.ItemIcon(m.id))
+        r.craftedText = craftedText
+        r.icon:SetTexture(ns.ItemIcon(name))
+        r.badge:SetTexture(prof.icon)
         r.count:SetText(m.have .. " / " .. m.need)
         r.count:SetTextColor(unpack(ok and COLOR_OK or COLOR_SHORT))
         r.check:SetShown(ok)
@@ -190,9 +196,33 @@ function UI:Build()
     -- Esc closes the panel, like other game windows.
     tinsert(UISpecialFrames, "ProfGuideFrame")
 
-    -- Header
-    self.title = NewText(f, "GameFontNormalLarge")
-    self.title:SetPoint("TOPLEFT", PAD, -PAD)
+    -- Header: profession picker. Icon + name + down arrow, as one button.
+    local picker = CreateFrame("Button", nil, f)
+    picker:SetPoint("TOPLEFT", PAD, -PAD + 3)
+    picker:SetHeight(22)
+    self.picker = picker
+
+    self.profIcon = picker:CreateTexture(nil, "ARTWORK")
+    self.profIcon:SetSize(18, 18)
+    self.profIcon:SetPoint("LEFT")
+    self.profIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    self.title = NewText(picker, "GameFontNormalLarge")
+    self.title:SetPoint("LEFT", self.profIcon, "RIGHT", 6, 0)
+    self.title:SetWordWrap(false)
+
+    self.arrow = picker:CreateTexture(nil, "ARTWORK")
+    self.arrow:SetSize(12, 12)
+    self.arrow:SetPoint("LEFT", self.title, "RIGHT", 6, -1)
+    self.arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    self.arrow:SetRotation(-math.pi / 2) -- point it downwards
+
+    -- Hover: name turns white, so it reads as clickable.
+    picker:SetScript("OnEnter", function() self.title:SetTextColor(1, 1, 1) end)
+    picker:SetScript("OnLeave", function() self.title:SetTextColor(1, 0.82, 0) end)
+    picker:SetScript("OnClick", function() UI:ToggleMenu() end)
+
+    self:BuildMenu()
 
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", 2, 2)
@@ -228,6 +258,7 @@ function UI:Build()
         b.line:SetPoint("TOPRIGHT", b.text, "BOTTOMRIGHT", 0, -3)
         b:SetScript("OnClick", function()
             ns.state.tab = key
+            UI.menu:Hide()
             UI:Refresh()
         end)
         return b
@@ -256,6 +287,7 @@ function UI:Build()
 
     self.boxLabel = NewText(box, "GameFontDisableSmall")
     self.boxLabel:SetPoint("TOPLEFT", BOX_PAD, -BOX_PAD)
+    self.boxLabel:SetWidth(ROW_W) -- long labels wrap inside the box
 
     self.summary = NewText(f, "GameFontHighlightSmall")
     self.summary:SetPoint("BOTTOMLEFT", PAD, PAD)
@@ -285,8 +317,113 @@ function UI:Build()
     end)
     self.currentBtn:SetPoint("BOTTOM", 0, PAD)
 
+    f:HookScript("OnHide", function() UI.menu:Hide() end)
     f:SetShown(ProfGuideDB.shown)
     self:Refresh()
+end
+
+-- ---------- Profession menu ----------
+-- A small dropdown: your professions first (with skill), then the rest.
+
+local MENU_W, ITEM_H = 236, 22
+
+function UI:BuildMenu()
+    local m = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
+    m:SetFrameStrata("DIALOG") -- draws above everything else
+    m:SetWidth(MENU_W)
+    m:SetPoint("TOPLEFT", self.picker, "BOTTOMLEFT", -6, -6)
+    m:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    m:SetBackdropColor(0.09, 0.09, 0.10, 0.98)
+    m:SetBackdropBorderColor(0.35, 0.27, 0.18, 1)
+    m:EnableMouse(true) -- clicks on the menu don't fall through to the panel
+    m:Hide()
+    self.menu = m
+    self.menuItems, self.menuHeaders = {}, {}
+end
+
+local function MenuItem(self, i)
+    if self.menuItems[i] then return self.menuItems[i] end
+    local b = CreateFrame("Button", nil, self.menu)
+    b:SetSize(MENU_W - 12, ITEM_H)
+    b:SetHighlightTexture("Interface\\Buttons\\WHITE8x8")
+    b:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.08)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize(16, 16)
+    b.icon:SetPoint("LEFT", 6, 0)
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b.label = NewText(b, "GameFontHighlight")
+    b.label:SetPoint("LEFT", b.icon, "RIGHT", 8, 0)
+    b.skill = NewText(b, "GameFontHighlightSmall", "RIGHT")
+    b.skill:SetPoint("RIGHT", -6, 0)
+    b.skill:SetTextColor(unpack(COLOR_MUTED))
+    b:SetScript("OnClick", function(btn)
+        ns.state.prof = btn.profName
+        ns.state.viewIndex = nil
+        ProfGuideDB.lastProf = btn.profName
+        UI.menu:Hide()
+        UI:Refresh()
+    end)
+    self.menuItems[i] = b
+    return b
+end
+
+local function MenuHeader(self, i)
+    if self.menuHeaders[i] then return self.menuHeaders[i] end
+    local fs = NewText(self.menu, "GameFontDisableSmall")
+    self.menuHeaders[i] = fs
+    return fs
+end
+
+function UI:ToggleMenu()
+    if self.menu:IsShown() then self.menu:Hide(); return end
+
+    -- Split into "yours" and "everything else".
+    local learned = ns.LearnedProfessions()
+    local isLearned = {}
+    for _, p in ipairs(learned) do isLearned[p.name] = p end
+    local others = {}
+    for _, name in ipairs(ns.ProfessionOrder) do
+        if not isLearned[name] then table.insert(others, { name = name }) end
+    end
+
+    local sections = {}
+    if #learned > 0 then table.insert(sections, { "YOUR PROFESSIONS", learned }) end
+    if #others > 0 then table.insert(sections, { #learned > 0 and "OTHER PROFESSIONS" or "PROFESSIONS", others }) end
+
+    local y, itemCount = -8, 0
+    for h, section in ipairs(sections) do
+        local header = MenuHeader(self, h)
+        header:ClearAllPoints()
+        header:SetPoint("TOPLEFT", 12, y)
+        header:SetText(section[1])
+        header:Show()
+        y = y - header:GetStringHeight() - 4
+
+        for _, p in ipairs(section[2]) do
+            itemCount = itemCount + 1
+            local b = MenuItem(self, itemCount)
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", 6, y)
+            b.profName = p.name
+            b.icon:SetTexture(ns.Professions[p.name].icon)
+            b.label:SetText(p.name)
+            -- Current profession in gold, others white.
+            if p.name == Prof().name then b.label:SetTextColor(1, 0.82, 0) else b.label:SetTextColor(1, 1, 1) end
+            b.skill:SetText(p.rank and (p.rank .. " / " .. p.max) or "")
+            b:Show()
+            y = y - ITEM_H
+        end
+        y = y - 8 -- gap between sections
+    end
+    for i = itemCount + 1, #self.menuItems do self.menuItems[i]:Hide() end
+    for i = #sections + 1, #self.menuHeaders do self.menuHeaders[i]:Hide() end
+
+    self.menu:SetHeight(-y)
+    self.menu:Show()
 end
 
 -- ---------- Drawing (runs whenever something changes) ----------
@@ -307,8 +444,10 @@ function UI:Draw()
     local skill, maxSkill = ns.GetSkill(prof)
     local current = ns.CurrentStepIndex(prof, skill)
 
-    -- Header
+    -- Header: icon + name; size the picker to fit so the arrow hugs the text
+    self.profIcon:SetTexture(prof.icon)
     self.title:SetText(prof.name)
+    self.picker:SetWidth(18 + 6 + self.title:GetStringWidth() + 6 + 12)
     if skill then
         self.skillText:SetText(skill .. " / " .. maxSkill)
         self.bar:SetValue(skill)
@@ -329,7 +468,7 @@ function UI:Draw()
     if onStep then
         local index = ns.state.viewIndex or current
         local step = prof.steps[index]
-        local mats, crafts = ns.StepMaterials(prof, step, skill)
+        local mats, crafts, verified = ns.StepMaterials(prof, step, skill)
 
         local label = "STEP " .. index .. " OF " .. #prof.steps
             .. "   SKILL " .. step.from .. "-" .. step.to
@@ -343,18 +482,29 @@ function UI:Draw()
         y = y - self.recipe:GetStringHeight() - GAP_IN_RECIPE
 
         Place(self.meta, y)
-        self.meta:SetText("Make about " .. crafts .. ".  Learn from: " .. step.source)
+        local meta = "Make about " .. crafts .. ".  Learn from: " .. step.source
+        if verified then meta = meta .. "\n|cff66d977Materials checked in game|r" end
+        self.meta:SetText(meta)
         self.meta:SetTextColor(unpack(COLOR_MUTED))
         y = y - self.meta:GetStringHeight() - GAP_BELOW_RECIPE
 
-        if step.note then
-            Place(self.note, y); self.note:SetText("Tip: " .. step.note)
+        -- Tips: the step's own note, rank training reminders, and a
+        -- warning if you've hit your skill cap.
+        local lines = {}
+        if step.note then table.insert(lines, "Tip: " .. step.note) end
+        local rankTips, capped = ns.RankTips(prof, step, skill, maxSkill)
+        for _, t in ipairs(rankTips) do table.insert(lines, t) end
+        if capped and index == current then
+            table.insert(lines, "|cffff7a6bYou've hit your skill cap. Train the next rank to keep levelling.|r")
+        end
+        if #lines > 0 then
+            Place(self.note, y); self.note:SetText(table.concat(lines, "\n"))
             y = y - self.note:GetStringHeight() - 12
         else
             self.note:Hide()
         end
 
-        y = self:FillBox("MATERIALS", mats, y)
+        y = self:FillBox("MATERIALS", mats, y, "You craft this in an earlier step.")
 
         self.prevBtn:Show(); self.nextBtn:Show(); self.currentBtn:Show()
         self.prevBtn:SetEnabled(index > 1)
@@ -368,13 +518,23 @@ function UI:Draw()
 
         self.eyebrow:Hide(); self.recipe:Hide(); self.meta:Hide(); self.note:Hide()
 
-        y = self:FillBox("EVERYTHING YOU NEED FROM HERE TO 300", list, y)
+        local label = (#list > 0) and "EVERYTHING TO GATHER OR BUY FROM HERE TO 300" or "NOTHING LEFT TO GET. NICE WORK!"
+        -- Long lists get cut to the biggest items so the panel stays a sensible height.
+        local MAX_ROWS = 15
+        local shown = list
+        if #list > MAX_ROWS then
+            shown = {}
+            for k = 1, MAX_ROWS do shown[k] = list[k] end
+        end
+        y = self:FillBox(label, shown, y)
 
         local ready = 0
         for _, m in ipairs(list) do
             if m.have >= m.need then ready = ready + 1 end
         end
-        self.summary:SetText(ready .. " of " .. #list .. " materials ready")
+        local summary = ready .. " of " .. #list .. " materials ready"
+        if #list > #shown then summary = summary .. "  (showing the biggest " .. #shown .. ")" end
+        self.summary:SetText(summary)
         self.summary:SetTextColor(unpack(COLOR_MUTED))
         self.summary:Show()
         self.prevBtn:Hide(); self.nextBtn:Hide(); self.currentBtn:Hide()

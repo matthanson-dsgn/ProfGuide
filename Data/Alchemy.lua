@@ -1,0 +1,42 @@
+-- Alchemy route for WoW Forever (content only, no logic).
+-- mats = materials for ONE craft: { "Item name", amount }
+local _, ns = ...
+
+ns.RegisterProfession({
+    name = "Alchemy",
+    skillLine = 171,
+    icon = "Interface\\Icons\\Trade_Alchemy",
+    steps = {
+        { from = 1, to = 12, recipe = "Elixir of Minor Force", crafts = 11, source = "Known",
+          mats = { {"Silverleaf", 1}, {"Empty Vial", 1} } },
+        { from = 12, to = 55, recipe = "Elixir of Minor Defense", crafts = 43, source = "Known",
+          mats = { {"Silverleaf", 1}, {"Peacebloom", 1}, {"Empty Vial", 1} } },
+        { from = 55, to = 65, recipe = "Minor Mana Potion", crafts = 10, source = "Trainer",
+          mats = { {"Mageroyal", 1}, {"Peacebloom", 1}, {"Empty Vial", 1} } },
+        { from = 65, to = 90, recipe = "Elixir of Minor Fortitude", crafts = 26, source = "Trainer",
+          mats = { {"Earthroot", 2}, {"Peacebloom", 1}, {"Empty Vial", 1} } },
+        { from = 90, to = 120, recipe = "Elixir of Wisdom", crafts = 30, source = "Trainer",
+          mats = { {"Mageroyal", 1}, {"Briarthorn", 2}, {"Empty Vial", 1} } },
+        { from = 120, to = 160, recipe = "Lesser Mana Potion", crafts = 43, source = "Trainer",
+          mats = { {"Mageroyal", 1}, {"Stranglekelp", 1}, {"Empty Vial", 1} } },
+        { from = 160, to = 195, recipe = "Mana Potion", crafts = 38, source = "Trainer",
+          mats = { {"Stranglekelp", 1}, {"Kingsblood", 1}, {"Leaded Vial", 1} } },
+        { from = 195, to = 205, recipe = "Elixir of Agility", crafts = 10, source = "Trainer",
+          mats = { {"Stranglekelp", 1}, {"Goldthorn", 1}, {"Leaded Vial", 1} } },
+        { from = 205, to = 225, recipe = "Greater Mana Potion", crafts = 20, source = "Trainer",
+          mats = { {"Khadgar's Whisker", 1}, {"Goldthorn", 1}, {"Leaded Vial", 1} } },
+        { from = 225, to = 226, recipe = "Philosopher's Stone", crafts = 1, source = "Recipe: Alchemist Pestlezugg",
+          note = "Keep the stone. Transmutes need it.",
+          mats = { {"Iron Bar", 4}, {"Black Vitriol", 1}, {"Purple Lotus", 4}, {"Firebloom", 4} } },
+        { from = 226, to = 240, recipe = "Greater Mana Potion", crafts = 20, source = "Trainer",
+          mats = { {"Khadgar's Whisker", 1}, {"Goldthorn", 1}, {"Leaded Vial", 1} } },
+        { from = 240, to = 260, recipe = "Draught of Detect Undead", crafts = 23, source = "Trainer",
+          mats = { {"Arthas' Tears", 1}, {"Crystal Vial", 1} } },
+        { from = 260, to = 270, recipe = "Superior Mana Potion", crafts = 10, source = "Recipe: Ulthir / Algernon",
+          mats = { {"Sungrass", 2}, {"Blindweed", 2}, {"Crystal Vial", 1} } },
+        { from = 270, to = 300, recipe = "Major Discolored Healing Potion", crafts = 31,
+          source = "Odd Child (Westfall) / Apothecary Renferrel (Silverpine)",
+          note = "Taught after a short quest chain.",
+          mats = { {"Plaguebloom", 1}, {"Murloc Eye", 1}, {"Crystal Vial", 1} } },
+    },
+})
