@@ -464,7 +464,9 @@ for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "SKILL_LINES_CHANGED", "CHA
                      "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED", "TRADE_SKILL_SHOW",
                      "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED",
                      "TRADE_SKILL_UPDATE" }) do
-    events:RegisterEvent(e)
+    -- Some events only exist in some versions of WoW. Registering an
+    -- unknown one is an error, so we try each safely and skip misses.
+    pcall(events.RegisterEvent, events, e)
 end
 
 local scanQueued = false
