@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0 (14/11/2026)
+- New Fast / Budget route switch (Leatherworking for now).
+- Budget Leatherworking route: no elixirs or gems, and about 180 Heavy Scorpid Scales instead of about 420, for a similar number of crafts.
+- Each profession remembers which route you picked.
+
 ## 0.3.2 (14/11/2026)
 - Renamed to ProfGuide Forever (folder: `ProfGuideForever`). Saved settings start fresh once.
 - Added `/pgf` as a slash command that won't clash with other add-ons.

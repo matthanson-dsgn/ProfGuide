@@ -268,6 +268,8 @@ function UI:Build()
     self.tabShop = MakeTab("Shopping list", "shop")
     self.tabShop:SetPoint("LEFT", self.tabStep, "RIGHT", 20, 0)
 
+    self:BuildRouteToggle()
+
     -- Content text
     self.eyebrow = NewText(f, "GameFontDisableSmall")
     self.recipe  = NewText(f, "GameFontHighlightLarge")
@@ -320,6 +322,50 @@ function UI:Build()
     f:HookScript("OnHide", function() UI.menu:Hide() end)
     f:SetShown(ProfGuideForeverDB.shown)
     self:Refresh()
+end
+
+-- ---------- Fast / Budget toggle ----------
+-- A small two-option switch (a "segmented control") on the tab row.
+-- Only shown for professions that have a budget route.
+
+local ROUTE_HELP = {
+    fast = "Fewest crafts. Some steps use pricier materials (gems, elixirs, scorpid scales).",
+    budget = "Cheaper, common materials. A few more crafts.",
+}
+
+function UI:BuildRouteToggle()
+    local wrap = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
+    wrap:SetSize(100, 20)
+    wrap:SetPoint("TOPRIGHT", -PAD, -55)
+    wrap:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+    wrap:SetBackdropBorderColor(1, 1, 1, 0.15)
+    self.routeToggle = wrap
+    self.routeButtons = {}
+
+    for i, key in ipairs({ "fast", "budget" }) do
+        local b = CreateFrame("Button", nil, wrap)
+        b:SetSize(49, 18)
+        b:SetPoint("LEFT", 1 + (i - 1) * 49, 0)
+        b.fill = b:CreateTexture(nil, "BACKGROUND")
+        b.fill:SetAllPoints()
+        b.fill:SetColorTexture(1, 1, 1, 0.14)
+        b.text = NewText(b, "GameFontHighlightSmall", "CENTER")
+        b.text:SetPoint("CENTER")
+        b.text:SetText(key == "fast" and "Fast" or "Budget")
+        b:SetScript("OnClick", function()
+            local _, def = ns.ActiveProf()
+            ns.SetRoute(def.name, key)
+            UI:Refresh()
+        end)
+        b:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+            GameTooltip:AddLine(btn.text:GetText() .. " route", 1, 0.82, 0)
+            GameTooltip:AddLine(ROUTE_HELP[key], 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        self.routeButtons[key] = b
+    end
 end
 
 -- ---------- Profession menu ----------
@@ -462,6 +508,15 @@ function UI:Draw()
     self.tabShop.line:SetShown(not onStep)
     self.tabStep.text:SetTextColor(unpack(onStep and { 1, 1, 1 } or COLOR_MUTED))
     self.tabShop.text:SetTextColor(unpack(onStep and COLOR_MUTED or { 1, 1, 1 }))
+
+    -- Route toggle: only for professions with more than one route.
+    local _, def = ns.ActiveProf()
+    self.routeToggle:SetShown(def.views.budget ~= nil)
+    for key, b in pairs(self.routeButtons) do
+        local on = (key == prof.routeKey)
+        b.fill:SetShown(on) -- selected = filled
+        b.text:SetTextColor(unpack(on and { 1, 1, 1 } or COLOR_MUTED))
+    end
 
     local y = -88 -- content starts under the tabs
 

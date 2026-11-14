@@ -24,23 +24,55 @@ local RANKS = {
 
 -- ---------- Registering professions (called by Data files) ----------
 
+-- Builds a "view" of a profession for one route: its steps plus
+-- quick lookups. The rest of the add-on only ever sees views.
+local function MakeView(def, key, label, steps)
+    local view = {
+        name = def.name, skillLine = def.skillLine, icon = def.icon,
+        rankNotes = def.rankNotes, routeKey = key, routeLabel = label,
+        steps = steps, recipeSet = {}, allRecipes = {},
+    }
+    -- recipeSet: things you make yourself on this route. Steps marked
+    -- gathered = true (e.g. Light Leather) don't count: you'd normally
+    -- skin or buy those. allRecipes: every recipe, for reading the
+    -- profession window.
+    for _, step in ipairs(steps) do
+        view.allRecipes[step.recipe] = true
+        if not step.gathered then view.recipeSet[step.recipe] = true end
+    end
+    return view
+end
+
 function ns.RegisterProfession(def)
-    -- Every recipe in the route, so we can tell when a material is
-    -- something you make yourself in another step.
-    -- Steps marked gathered = true make something you'd normally
-    -- gather instead (e.g. Light Leather), so they don't count.
-    -- allRecipes = every recipe on the route (used to read the profession window).
-    def.recipeSet, def.allRecipes = {}, {}
-    for _, step in ipairs(def.steps) do
-        def.allRecipes[step.recipe] = true
-        if not step.gathered then def.recipeSet[step.recipe] = true end
+    def.views = { fast = MakeView(def, "fast", "Fast", def.steps) }
+    if def.budgetSteps then
+        def.views.budget = MakeView(def, "budget", "Budget", def.budgetSteps)
+    end
+    -- Every recipe across all routes, for reading the profession window.
+    def.allRecipes = {}
+    for _, view in pairs(def.views) do
+        for name in pairs(view.allRecipes) do def.allRecipes[name] = true end
     end
     ns.Professions[def.name] = def
     table.insert(ns.ProfessionOrder, def.name)
 end
 
+-- Which route a profession is using ("fast" unless you picked another).
+function ns.RouteKey(def)
+    local saved = ProfGuideForeverDB and ProfGuideForeverDB.routes and ProfGuideForeverDB.routes[def.name]
+    if saved and def.views[saved] then return saved end
+    return "fast"
+end
+
+function ns.SetRoute(name, key)
+    ProfGuideForeverDB.routes[name] = key
+    ns.state.viewIndex = nil
+end
+
+-- The profession on screen, as a view of its chosen route.
 function ns.ActiveProf()
-    return ns.Professions[ns.state.prof] or ns.Professions[ns.ProfessionOrder[1]]
+    local def = ns.Professions[ns.state.prof] or ns.Professions[ns.ProfessionOrder[1]]
+    return def.views[ns.RouteKey(def)], def
 end
 
 -- ---------- Saved data ----------
@@ -56,6 +88,7 @@ local function InitDB()
     db.itemIDs = db.itemIDs or {}   -- item name -> ID, learned in game
     db.recipes = db.recipes or {}   -- recipe name -> materials, read from profession windows
     db.skills  = db.skills or {}    -- character -> profession -> { skill, max }
+    db.routes  = db.routes or {}    -- profession -> "fast" or "budget"
     db.skills[CharKey()] = db.skills[CharKey()] or {}
 end
 

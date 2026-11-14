@@ -15,6 +15,11 @@ All crafting professions from 1 to 300: Alchemy, Blacksmithing, Enchanting, Engi
 
 Pick a profession from the dropdown in the panel's header. Your character's professions are listed first.
 
+## Fast or Budget
+Leatherworking has two routes. Switch between them with the **Fast | Budget** toggle on the panel:
+- **Fast:** the fewest crafts. Some steps use pricier materials.
+- **Budget:** cheaper, common materials, for a similar number of crafts.
+
 ## Self-correcting data
 - Items are recognised **by name**. Their IDs are learned from your bags and profession windows.
 - When you open a profession window, ProfGuide reads the real materials for every recipe on the route and uses them from then on. Steps checked this way show "Materials checked in game".
