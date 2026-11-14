@@ -424,14 +424,43 @@ local function Check()
             end
         end
     end
-    local verified = 0
+    -- Which steps the game has confirmed, which it hasn't, and which
+    -- recipes have different materials in game than in our data.
+    local verified, missing, differs, listed = 0, {}, {}, {}
     for _, step in ipairs(prof.steps) do
-        if ProfGuideDB.recipes[step.recipe] then verified = verified + 1 end
+        local scanned = ProfGuideDB.recipes[step.recipe]
+        if scanned then
+            verified = verified + 1
+            local same = (#scanned == #step.mats)
+            if same then
+                local ours = {}
+                for _, m in ipairs(step.mats) do ours[m[1]] = m[2] end
+                for _, m in ipairs(scanned) do
+                    if ours[m[1]] ~= m[2] then same = false end
+                end
+            end
+            if not same and not listed[step.recipe] then
+                listed[step.recipe] = true
+                local parts = {}
+                for _, m in ipairs(scanned) do table.insert(parts, m[2] .. " " .. m[1]) end
+                table.insert(differs, step.recipe .. " = " .. table.concat(parts, ", "))
+            end
+        elseif not listed[step.recipe] then
+            listed[step.recipe] = true
+            table.insert(missing, step.recipe)
+        end
     end
 
     local gold, grey, red = "|cffffd100", "|cff9d9d9d", "|cffff5555"
     print(gold .. "ProfGuide check: " .. prof.name .. "|r")
     print("  Recipes confirmed from your profession window: " .. verified .. " of " .. #prof.steps)
+    if #missing > 0 then
+        print(grey .. "  Not confirmed (name may differ in game): " .. table.concat(missing, ", ") .. "|r")
+    end
+    if #differs > 0 then
+        print(grey .. "  Different in game (the game's version is being used):|r")
+        for _, line in ipairs(differs) do print(grey .. "    " .. line .. "|r") end
+    end
     print("  Materials recognised: " .. known .. " of " .. (known + #unknown))
     if #unknown > 0 then
         print(grey .. "  Not seen yet (carry one or open the profession window): " .. table.concat(unknown, ", ") .. "|r")
