@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 (14/11/2026)
+- Reads both modern and Classic-style profession windows.
+- `/pg check` now shows unconfirmed recipes, recipes whose materials differ in game, and when the last scan ran.
+- Fix: game events are registered safely, so an unknown event can't stop the add-on loading.
+- Fix: recipes for gathered materials (e.g. Light Leather) are now read from the profession window.
+- Leatherworking checked in game: all 25 steps confirmed.
+
 ## 0.3.0 (14/11/2026)
 - Minimap button: click to show or hide the panel, and drag it to move it around the minimap.
 - `/pg minimap` hides or shows the button.
