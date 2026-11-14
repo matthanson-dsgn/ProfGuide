@@ -29,8 +29,10 @@ function ns.RegisterProfession(def)
     -- something you make yourself in another step.
     -- Steps marked gathered = true make something you'd normally
     -- gather instead (e.g. Light Leather), so they don't count.
-    def.recipeSet = {}
+    -- allRecipes = every recipe on the route (used to read the profession window).
+    def.recipeSet, def.allRecipes = {}, {}
     for _, step in ipairs(def.steps) do
+        def.allRecipes[step.recipe] = true
         if not step.gathered then def.recipeSet[step.recipe] = true end
     end
     ns.Professions[def.name] = def
@@ -173,7 +175,7 @@ end
 local function RouteRecipeNames()
     local set = {}
     for _, prof in pairs(ns.Professions) do
-        for name in pairs(prof.recipeSet) do set[name] = true end
+        for name in pairs(prof.allRecipes) do set[name] = true end
     end
     return set
 end
