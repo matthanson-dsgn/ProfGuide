@@ -2,8 +2,10 @@
 ## Title: ProfGuide
 ## Notes: In-game profession levelling guide with a live shopping list.
 ## Author: Matt
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: ProfGuideDB
+## IconTexture: Interface\AddOns\ProfGuide\Media\MinimapIcon
+## AddonCompartmentFunc: ProfGuide_OnAddonCompartmentClick
 
 # Files load top to bottom. Core first, so the Data files can register.
 Core.lua
@@ -17,3 +19,4 @@ Data\Tailoring.lua
 Data\Cooking.lua
 Data\FirstAid.lua
 UI.lua
+Minimap.lua

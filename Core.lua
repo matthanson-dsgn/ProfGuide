@@ -411,6 +411,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
             ns.state.prof = learned[1] and learned[1].name or ns.ProfessionOrder[1]
         end
         if ns.UI then ns.UI:Build() end
+        if ns.Minimap then ns.Minimap:Build() end
         return
     end
 
@@ -430,12 +431,15 @@ end)
 -- /pg          show or hide the panel
 -- /pg check    check the current profession's data against the game
 -- /pg reset    move the panel back to the middle-right of the screen
+-- /pg minimap  hide or show the minimap button
 SLASH_PROFGUIDE1 = "/profguide"
 SLASH_PROFGUIDE2 = "/pg"
 SlashCmdList.PROFGUIDE = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
     if msg == "check" then
         Check()
+    elseif msg == "minimap" then
+        if ns.Minimap then ns.Minimap:Toggle() end
     elseif msg == "reset" then
         ProfGuideDB.pos = nil
         if ns.UI and ns.UI.frame then

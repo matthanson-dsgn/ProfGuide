@@ -8,6 +8,7 @@ An in-game profession levelling guide for **World of Warcraft: Forever**. Stop t
 - Follows your skill automatically and moves to the next step as you level.
 - Lets you browse ahead or back with Prev / Next.
 - You can drag the panel anywhere; it remembers its position.
+- A minimap button opens and closes the panel.
 
 ## Professions
 All crafting professions from 1 to 300: Alchemy, Blacksmithing, Enchanting, Engineering, Leatherworking and Tailoring, plus Cooking and First Aid.
@@ -23,6 +24,7 @@ Pick a profession from the dropdown in the panel's header. Your character's prof
 |---|---|
 | `/pg` or `/profguide` | Show or hide the panel |
 | `/pg check` | Check the current profession's data against the game |
+| `/pg minimap` | Hide or show the minimap button |
 | `/pg reset` | Move the panel back to its starting position |
 | `Esc` | Close the panel |
 

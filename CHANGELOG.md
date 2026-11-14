@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 (14/11/2026)
+- Minimap button: click to show or hide the panel, and drag it to move it around the minimap.
+- `/pg minimap` hides or shows the button.
+- Icon shown in the AddOns list and the minimap add-on menu.
+
 ## 0.2.0 (14/11/2026)
 - Added Alchemy, Blacksmithing, Enchanting, Engineering, Tailoring, Cooking and First Aid.
 - Rebuilt the Leatherworking route using WoW Forever's recipe and skill-range changes.
