@@ -289,17 +289,25 @@ function UI:Build()
         f.CloseButton:SetScript("OnClick", function() UI:Toggle(false) end)
     end
 
-    -- Help button (blue "i") in the title bar, left of the close button.
-    local help = TryCreate("Button", nil, f, "UIPanelInfoButton")
-    if not help then
-        help = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-        help:SetSize(20, 18)
-        help:SetText("?")
-    end
+    -- Help button in the title bar, left of the close button: WoW's
+    -- question-mark icon, drawn by us so it works in every version.
+    local help = CreateFrame("Button", nil, f)
+    help:SetSize(18, 18)
+    local helpIcon = help:CreateTexture(nil, "ARTWORK")
+    helpIcon:SetAllPoints()
+    helpIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    helpIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local helpBorder = help:CreateTexture(nil, "OVERLAY")
+    helpBorder:SetSize(32, 32)
+    helpBorder:SetPoint("CENTER")
+    helpBorder:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    help:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    help:SetScript("OnMouseDown", function() helpIcon:SetPoint("TOPLEFT", 1, -1); helpIcon:SetPoint("BOTTOMRIGHT", 1, -1) end)
+    help:SetScript("OnMouseUp", function() helpIcon:SetAllPoints() end)
     if type(f.CloseButton) == "table" then
-        help:SetPoint("RIGHT", f.CloseButton, "LEFT", -2, 0)
+        help:SetPoint("RIGHT", f.CloseButton, "LEFT", -4, 0)
     else
-        help:SetPoint("TOPRIGHT", -28, -3)
+        help:SetPoint("TOPRIGHT", -30, -4)
     end
     help:SetFrameLevel(f:GetFrameLevel() + 10)
     help:SetScript("OnClick", function() if ns.Welcome then ns.Welcome.Show() end end)

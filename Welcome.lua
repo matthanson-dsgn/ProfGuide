@@ -108,9 +108,11 @@ local function Build()
     ok2:SetPoint("BOTTOM", 0, 3)
     ok2:SetScript("OnClick", function() f:Hide() end)
 
-    f:SetScript("OnHide", function() ProfGuideForeverDB.welcomeSeen = true end)
     f:SetHeight(-y + 14 + 26)
     f:Hide()
+    -- Set after the Hide above, so building the window doesn't count as
+    -- "seen". Closing it any way (Got it, X or Esc) does.
+    f:SetScript("OnHide", function() ProfGuideForeverDB.welcomeSeen = true end)
     Welcome.frame = f
 end
 

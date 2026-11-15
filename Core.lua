@@ -100,6 +100,12 @@ local function InitDB()
     db.prices  = db.prices or {}    -- item name -> vendor price per item (copper), seen at a vendor
     db.difficulty = db.difficulty or {} -- character -> recipe -> { colour, skill when seen }
     if db.dock == nil then db.dock = true end -- snap beside the profession window
+    -- Earlier versions could mark the welcome window as seen before it
+    -- appeared, so show it once more.
+    if db.welcomeVersion ~= 2 then
+        db.welcomeSeen = nil
+        db.welcomeVersion = 2
+    end
 end
 
 -- This character's part of a saved table (e.g. "skills"), created on demand.
@@ -579,14 +585,22 @@ function ns.AuctionCost(list)
     return total, unpriced
 end
 
--- Money as text with WoW's coin icons, e.g. 2g 34s 50c.
+-- Money as text with WoW's gold/silver/copper coin icons.
+local COIN = "|TInterface\\MoneyFrame\\UI-%sIcon:0:0:2:0|t"
 function ns.MoneyText(copper)
+    copper = math.floor(copper + 0.5)
+    -- Newer clients keep WoW's own version here; older ones globally.
+    if C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString then
+        local ok, text = pcall(C_CurrencyInfo.GetCoinTextureString, copper)
+        if ok and text then return text end
+    end
     if GetCoinTextureString then return GetCoinTextureString(copper) end
+    -- Backup: build it ourselves with the coin icons.
     local g, s, c = math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100
     local parts = {}
-    if g > 0 then table.insert(parts, g .. "g") end
-    if s > 0 then table.insert(parts, s .. "s") end
-    if c > 0 or #parts == 0 then table.insert(parts, c .. "c") end
+    if g > 0 then table.insert(parts, g .. COIN:format("Gold")) end
+    if s > 0 then table.insert(parts, s .. COIN:format("Silver")) end
+    if c > 0 or #parts == 0 then table.insert(parts, c .. COIN:format("Copper")) end
     return table.concat(parts, " ")
 end
 

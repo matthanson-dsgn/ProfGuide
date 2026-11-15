@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.4 (15/11/2026)
+- Prices now show WoW's gold, silver and copper coin icons.
+- Fix: the welcome window could mark itself as seen before it appeared. It shows once more after this update.
+- Fix: the help button was invisible in Forever. It's now a question-mark icon in the title bar.
+
 ## 0.9.3 (15/11/2026)
 - Docks further right, clear of the profession window's tabs.
 - Open recipe is greyed out for recipes you haven't learned.
