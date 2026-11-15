@@ -2,7 +2,7 @@
 ## Title: ProfGuide Forever
 ## Notes: In-game profession levelling guide with a live shopping list.
 ## Author: Matt
-## Version: 0.7.0
+## Version: 0.8.0
 ## SavedVariables: ProfGuideForeverDB
 ## IconTexture: Interface\AddOns\ProfGuideForever\Media\MinimapIcon
 ## AddonCompartmentFunc: ProfGuideForever_OnAddonCompartmentClick
@@ -22,4 +22,5 @@ Data\Trainers.lua
 Data\VendorPrices.lua
 Finder.lua
 UI.lua
+Welcome.lua
 Minimap.lua

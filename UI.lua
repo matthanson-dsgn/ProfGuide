@@ -259,6 +259,29 @@ function UI:Build()
         f.CloseButton:SetScript("OnClick", function() UI:Toggle(false) end)
     end
 
+    -- Help button (blue "i") in the title bar, left of the close button.
+    local help = TryCreate("Button", nil, f, "UIPanelInfoButton")
+    if not help then
+        help = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        help:SetSize(20, 18)
+        help:SetText("?")
+    end
+    if type(f.CloseButton) == "table" then
+        help:SetPoint("RIGHT", f.CloseButton, "LEFT", -2, 0)
+    else
+        help:SetPoint("TOPRIGHT", -28, -3)
+    end
+    help:SetFrameLevel(f:GetFrameLevel() + 10)
+    help:SetScript("OnClick", function() if ns.Welcome then ns.Welcome.Show() end end)
+    help:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:AddLine("Help", 1, 0.82, 0)
+        GameTooltip:AddLine("What ProfGuide Forever does, and how to keep its data accurate.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    help:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.helpBtn = help
+
     -- Fallback panels have no portrait, so content starts further left.
     local headerX = f.wowStyle and 62 or PAD
 
@@ -384,6 +407,7 @@ function UI:Build()
 
     f:SetShown(ProfGuideForeverDB.shown)
     self:Refresh()
+    if f:IsShown() and ns.Welcome then ns.Welcome.ShowIfFirstTime() end
 end
 
 -- ---------- Tabs under the window: This step / Shopping list ----------
@@ -695,5 +719,8 @@ function UI:Toggle(show)
     if show == nil then show = not self.frame:IsShown() end
     self.frame:SetShown(show)
     ProfGuideForeverDB.shown = show
-    if show then self:Refresh() end
+    if show then
+        self:Refresh()
+        if ns.Welcome then ns.Welcome.ShowIfFirstTime() end
+    end
 end

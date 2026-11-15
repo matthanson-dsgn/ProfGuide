@@ -31,6 +31,7 @@ Leatherworking has two routes. Switch between them with the **Fast | Budget** to
 | Command | What it does |
 |---|---|
 | `/pg` or `/pgf` | Show or hide the panel (`/pgf` always works, even if another add-on uses `/pg`) |
+| `/pg help` | Open the welcome / help window |
 | `/pg check` | Check the current profession's data against the game |
 | `/pg trainers` | List the nearest trainers for the current profession |
 | `/pg minimap` | Hide or show the minimap button |

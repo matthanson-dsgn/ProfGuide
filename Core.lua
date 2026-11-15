@@ -724,6 +724,7 @@ end)
 -- /pg reset    move the panel back to the middle-right of the screen
 -- /pg minimap  hide or show the minimap button
 -- /pg trainers list the nearest trainers for the current profession
+-- /pg help     open the welcome / help window
 SLASH_PROFGUIDEFOREVER1 = "/pgf"
 SLASH_PROFGUIDEFOREVER2 = "/pg"
 SLASH_PROFGUIDEFOREVER3 = "/profguide"
@@ -731,6 +732,8 @@ SlashCmdList.PROFGUIDEFOREVER = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
     if msg == "check" then
         Check()
+    elseif msg == "help" then
+        if ns.Welcome then ns.Welcome.Show() end
     elseif msg == "trainers" or msg == "trainer" then
         if ns.Finder then ns.Finder.PrintNearest() end
     elseif msg == "minimap" then

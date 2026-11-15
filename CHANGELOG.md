@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 (15/11/2026)
+- Welcome window the first time the add-on opens: what it does, how its data becomes accurate, and handy commands.
+- Help button (i) in the title bar, and `/pg help`, to open it again.
+
 ## 0.7.0 (15/11/2026)
 - Vendor ingredient costs: each reagents box shows the total price of the shop-bought items you still need (thread, dye, salt, vials, flux, spices).
 - Hover a vendor item to see its price each and the cost of what you still need.
