@@ -100,6 +100,9 @@ local function InitDB()
     db.prices  = db.prices or {}    -- item name -> vendor price per item (copper), seen at a vendor
     db.difficulty = db.difficulty or {} -- character -> recipe -> { colour, skill when seen }
     if db.dock == nil then db.dock = true end -- snap beside the profession window
+    if db.toast == nil then db.toast = true end           -- "Step complete!" pop-up
+    if db.toastSound == nil then db.toastSound = true end -- ...with a sound
+    db.scale = db.scale or 1                               -- panel size (1 = 100%)
     -- Earlier versions could mark the welcome window as seen before it
     -- appeared, so show it once more.
     if db.welcomeVersion ~= 2 then
@@ -803,6 +806,7 @@ local function QueueTradeSkillScan()
         scanQueued = false
         local ok, err = pcall(ScanTradeSkill)
         if not ok then print("|cffff5555ProfGuide Forever scan error:|r " .. tostring(err)) end
+        if ns.Toast then pcall(ns.Toast.CheckProgress) end
         if ns.UI then ns.UI:Refresh() end
     end)
 end
@@ -819,6 +823,9 @@ events:SetScript("OnEvent", function(self, event, arg1)
         ns.state.prof = ProfGuideForeverDB.lastProf -- the UI swaps it if this character doesn't have it
         if ns.UI then ns.UI:Build() end
         if ns.Minimap then ns.Minimap:Build() end
+        if ns.Settings then pcall(ns.Settings.Build) end
+        -- Note each profession's starting step, so the pop-up knows when you move on.
+        C_Timer.After(2, function() if ns.Toast then pcall(ns.Toast.CheckProgress) end end)
         return
     end
 
@@ -829,6 +836,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
         if not ok then print("|cffff5555ProfGuide Forever price error:|r " .. tostring(err)) end
     elseif event == "SKILL_LINES_CHANGED" or event == "CHAT_MSG_SKILL" then
         ns.state.viewIndex = nil -- skill moved: jump back to your current step
+        if ns.Toast then pcall(ns.Toast.CheckProgress) end
     elseif event:find("TRADE_SKILL") then
         QueueTradeSkillScan()
         return
@@ -845,6 +853,7 @@ end)
 -- /pg trainers list the nearest trainers for the current profession
 -- /pg help     open the welcome / help window
 -- /pg dock     turn docking beside the profession window on or off
+-- /pg settings open the settings page
 SLASH_PROFGUIDEFOREVER1 = "/pgf"
 SLASH_PROFGUIDEFOREVER2 = "/pg"
 SLASH_PROFGUIDEFOREVER3 = "/profguide"
@@ -852,6 +861,8 @@ SlashCmdList.PROFGUIDEFOREVER = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
     if msg == "check" then
         Check()
+    elseif msg == "settings" or msg == "options" or msg == "config" then
+        if ns.Settings then ns.Settings.Open() end
     elseif msg == "dock" then
         if ns.Dock then ns.Dock.Toggle() end
     elseif msg == "help" then

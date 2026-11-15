@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0 (15/11/2026)
+- "Step complete!" pop-up with a sound when you finish a step, showing what to make next. Click it to open the guide.
+- Settings page in Options > AddOns: panel size, lock position, open beside profession windows, minimap button, pop-up and sound, plus Show welcome window and Reset position.
+- Open settings from the gear icon on the guide, by right-clicking the minimap button, or with `/pg settings`.
+
 ## 0.9.6 (15/11/2026)
 - More line height and spacing in the welcome window.
 

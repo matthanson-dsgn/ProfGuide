@@ -54,14 +54,19 @@ function Btn:Build()
     b:SetScript("OnMouseDown", function() icon:SetPoint("TOPLEFT", 8, -7) end)
     b:SetScript("OnMouseUp", function() icon:SetPoint("TOPLEFT", 7, -6) end)
 
-    b:SetScript("OnClick", function()
-        if ns.UI then ns.UI:Toggle() end
+    b:SetScript("OnClick", function(_, mouseButton)
+        if mouseButton == "RightButton" then
+            if ns.Settings then ns.Settings.Open() end
+        elseif ns.UI then
+            ns.UI:Toggle()
+        end
     end)
 
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("ProfGuide Forever", 1, 0.82, 0)
         GameTooltip:AddLine("Click to show or hide the guide.", 1, 1, 1)
+        GameTooltip:AddLine("Right-click for settings.", 1, 1, 1)
         GameTooltip:AddLine("Drag to move this button.", 0.62, 0.62, 0.62)
         GameTooltip:Show()
     end)
@@ -84,6 +89,13 @@ function Btn:Build()
     self.button = b
     UpdatePosition(b)
     b:SetShown(not ProfGuideForeverDB.minimap.hide)
+end
+
+-- Settings page: show or hide the button.
+function Btn:SetShown(show)
+    ProfGuideForeverDB.minimap = ProfGuideForeverDB.minimap or { angle = 225 }
+    ProfGuideForeverDB.minimap.hide = not show
+    if self.button then self.button:SetShown(show) end
 end
 
 -- /pg minimap: hide or show the button.

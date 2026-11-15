@@ -12,6 +12,8 @@ An in-game profession levelling guide for **World of Warcraft: Forever**. Stop t
 - Shows the total cost of vendor-bought ingredients (thread, dye, salt, vials...), learning real prices when you visit a vendor.
 - Snaps beside your profession window and shows each recipe's skill-up colour.
 - Auction House prices and a total cost to 300 if you use TSM or Auctionator.
+- "Step complete!" pop-up when you finish a step.
+- Settings page in Options > AddOns.
 - "Open recipe" jumps straight to the step's recipe in your profession window.
 - Shows which recipes you haven't learned yet, and your nearest trainer (click to open the map).
 
@@ -33,6 +35,7 @@ Leatherworking has two routes. Switch between them with the **Fast | Budget** to
 | Command | What it does |
 |---|---|
 | `/pg` or `/pgf` | Show or hide the panel (`/pgf` always works, even if another add-on uses `/pg`) |
+| `/pg settings` | Open the settings page (also: gear icon, or right-click the minimap button) |
 | `/pg dock` | Turn snapping beside the profession window on or off |
 | `/pg help` | Open the welcome / help window |
 | `/pg check` | Check the current profession's data against the game |

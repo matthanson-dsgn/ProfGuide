@@ -263,6 +263,7 @@ function UI:Build()
     local f = CreateWindow()
     self.frame = f
     f:SetSize(WIDTH, 400)
+    f:SetScale(ProfGuideForeverDB.scale or 1) -- "Panel size" setting
     f:SetFrameStrata("MEDIUM")
     f:SetClampedToScreen(true)
     f:SetToplevel(true)
@@ -274,6 +275,7 @@ function UI:Build()
     -- While docked beside the profession window, it stays put.
     f:SetScript("OnDragStart", function(frame)
         if ns.Dock and ns.Dock.active then return end
+        if ProfGuideForeverDB.locked then return end -- "Lock position" setting
         frame:StartMoving()
     end)
     f:SetScript("OnDragStop", function(frame)
@@ -324,6 +326,30 @@ function UI:Build()
     end)
     help:SetScript("OnLeave", function() GameTooltip:Hide() end)
     self.helpBtn = help
+
+    -- Settings button (gear icon), left of the help button.
+    local gear = CreateFrame("Button", nil, f)
+    gear:SetSize(18, 18)
+    gear:SetPoint("RIGHT", help, "LEFT", -6, 0)
+    gear:SetFrameLevel(level)
+    local gearIcon = gear:CreateTexture(nil, "ARTWORK")
+    gearIcon:SetAllPoints()
+    gearIcon:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
+    gearIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local gearBorder = gear:CreateTexture(nil, "OVERLAY")
+    gearBorder:SetSize(32, 32)
+    gearBorder:SetPoint("CENTER")
+    gearBorder:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    gear:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    gear:SetScript("OnClick", function() if ns.Settings then ns.Settings.Open() end end)
+    gear:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:AddLine("Settings", 1, 0.82, 0)
+        GameTooltip:AddLine("Panel size, lock, docking, minimap button and pop-ups.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    gear:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.gearBtn = gear
 
     -- Fallback panels have no portrait, so content starts further left.
     local headerX = f.wowStyle and 62 or PAD

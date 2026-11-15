@@ -30,7 +30,7 @@ local CONTENT = {
     { "item", "/pg or the minimap button: open or close the guide" },
     { "item", "/pg trainers: list your nearest trainers" },
     { "item", "/pg check: check the guide against the game" },
-    { "item", "/pg dock: turn snapping beside the profession window on or off" },
+    { "item", "/pg settings, the gear icon, or right-click the minimap button: settings" },
     { "note", "Open this window again any time with the help button on the guide, or /pg help." },
 }
 
