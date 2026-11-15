@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 (15/11/2026)
+- Vendor ingredient costs: each reagents box shows the total price of the shop-bought items you still need (thread, dye, salt, vials, flux, spices).
+- Hover a vendor item to see its price each and the cost of what you still need.
+- Prices start as Classic-era estimates, marked "(est.)", and are replaced by the real price when you open a vendor that sells the item.
+
 ## 0.6.0 (15/11/2026)
 - New WoW-style window: profession portrait, title bar, skill bar, inset content area and "Reagents" box.
 - "This step" and "Shopping list" are now proper WoW tabs under the window.

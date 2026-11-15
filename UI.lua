@@ -142,6 +142,19 @@ function UI:GetRow(i)
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(row.craftedText, 1, 0.82, 0, true)
         end
+        -- Vendor price: each, and for what you still need.
+        local price, real = ns.VendorPrice(row.itemName)
+        if price then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddDoubleLine("Vendor price (each)", ns.MoneyText(price) .. (real and "" or " (est.)"), 1, 0.82, 0, 1, 1, 1)
+            local missing = math.max(0, (row.need or 0) - (row.have or 0))
+            if missing > 0 then
+                GameTooltip:AddDoubleLine("You need " .. missing .. " more", ns.MoneyText(missing * price), 1, 1, 1, 1, 1, 1)
+            end
+            if not real then
+                GameTooltip:AddLine("Estimate. Open a vendor that sells it to get the real price.", 0.62, 0.62, 0.62, true)
+            end
+        end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -167,6 +180,7 @@ function UI:FillBox(label, list, y, craftedText)
 
         local ok = m.have >= m.need
         r.itemName = m.name
+        r.need, r.have = m.need, m.have
         r.crafted = m.crafted
         r.craftedText = craftedText
         r.icon:SetTexture(ns.ItemIcon(m.name))
@@ -187,6 +201,25 @@ function UI:FillBox(label, list, y, craftedText)
     for i = #list + 1, #self.rows do self.rows[i]:Hide() end
 
     local height = -rowsTop + #list * ROW_H + BOX_PAD - 4
+
+    -- Vendor cost footer (only when there are shop-bought items).
+    local cost, estimated, vendorItems = ns.VendorCost(list)
+    if vendorItems > 0 then
+        local text
+        if cost > 0 then
+            text = "|cffffd100Vendor ingredients:|r " .. ns.MoneyText(cost)
+            if estimated then text = text .. "  |cff9d9d9d(est.)|r" end
+        else
+            text = "|cffffd100Vendor ingredients:|r |cff66d977all in your bags|r"
+        end
+        self.boxFooter:SetText(text)
+        self.boxFooter:ClearAllPoints()
+        self.boxFooter:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -(height - BOX_PAD + 10))
+        self.boxFooter:Show()
+        height = height + self.boxFooter:GetStringHeight() + 8
+    else
+        self.boxFooter:Hide()
+    end
     box:SetHeight(height)
     box:Show()
     return y - height
@@ -315,6 +348,9 @@ function UI:Build()
     self.boxLabel = NewText(box, "GameFontNormal") -- gold "Reagents:"
     self.boxLabel:SetPoint("TOPLEFT", BOX_PAD, -BOX_PAD)
     self.boxLabel:SetWidth(ROW_W)
+    -- Footer: total cost of shop-bought ingredients you still need.
+    self.boxFooter = NewText(box, "GameFontHighlightSmall")
+    self.boxFooter:SetWidth(ROW_W)
 
     self.summary = NewText(f, "GameFontHighlightSmall")
     self.summary:SetPoint("BOTTOMLEFT", 12, 8)

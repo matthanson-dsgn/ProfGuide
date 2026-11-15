@@ -9,6 +9,7 @@ An in-game profession levelling guide for **World of Warcraft: Forever**. Stop t
 - Lets you browse ahead or back with Prev / Next.
 - You can drag the panel anywhere; it remembers its position.
 - A minimap button opens and closes the panel.
+- Shows the total cost of vendor-bought ingredients (thread, dye, salt, vials...), learning real prices when you visit a vendor.
 - "Open recipe" jumps straight to the step's recipe in your profession window.
 - Shows which recipes you haven't learned yet, and your nearest trainer (click to open the map).
 

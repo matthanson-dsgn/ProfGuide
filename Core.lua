@@ -97,6 +97,7 @@ local function InitDB()
     db.routes  = db.routes or {}    -- profession -> "fast" or "budget"
     db.known   = db.known or {}     -- character -> recipe name -> learned? (true/false)
     db.recipeIDs = db.recipeIDs or {} -- recipe name -> the game's recipe ID (for "Open recipe")
+    db.prices  = db.prices or {}    -- item name -> vendor price per item (copper), seen at a vendor
 end
 
 -- This character's part of a saved table (e.g. "skills"), created on demand.
@@ -471,6 +472,72 @@ function ns.RankTips(prof, step, skill, maxSkill)
     return tips, capped
 end
 
+-- ---------- Vendor prices ----------
+
+-- Price of one item from a vendor, in copper, and whether it's the
+-- real price (seen at a vendor) or our starting estimate.
+-- Returns nil for things vendors don't sell.
+function ns.VendorPrice(name)
+    local seen = ProfGuideForeverDB and ProfGuideForeverDB.prices[name]
+    if seen then return seen, true end
+    local seed = ns.SeedPrices and ns.SeedPrices[name]
+    if seed then return seed, false end
+end
+
+-- Total cost of the vendor items in a materials list that you still
+-- need (need minus what you have). Also says if any price is an estimate.
+function ns.VendorCost(list)
+    local total, estimated, count = 0, false, 0
+    for _, m in ipairs(list) do
+        local price, real = ns.VendorPrice(m.name)
+        if price then
+            count = count + 1
+            local missing = math.max(0, m.need - m.have)
+            total = total + missing * price
+            if missing > 0 and not real then estimated = true end
+        end
+    end
+    return total, estimated, count
+end
+
+-- Money as text with WoW's coin icons, e.g. 2g 34s 50c.
+function ns.MoneyText(copper)
+    if GetCoinTextureString then return GetCoinTextureString(copper) end
+    local g, s, c = math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100
+    local parts = {}
+    if g > 0 then table.insert(parts, g .. "g") end
+    if s > 0 then table.insert(parts, s .. "s") end
+    if c > 0 or #parts == 0 then table.insert(parts, c .. "c") end
+    return table.concat(parts, " ")
+end
+
+-- When you open a vendor, save the real price of anything it sells
+-- that's on one of our routes (gold-priced items only).
+local function ScanMerchant()
+    local count = GetMerchantNumItems and GetMerchantNumItems() or 0
+    local wanted = {}
+    for _, def in pairs(ns.Professions) do
+        for _, view in pairs(def.views) do
+            for _, step in ipairs(view.steps) do
+                for _, m in ipairs(step.mats) do wanted[m[1]] = true end
+            end
+        end
+    end
+    for i = 1, count do
+        local name, price, quantity, extendedCost
+        if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
+            local info = C_MerchantFrame.GetItemInfo(i)
+            if info then name, price, quantity, extendedCost = info.name, info.price, info.stackCount, info.hasExtendedCost end
+        elseif GetMerchantItemInfo then
+            local n, _, p, q, _, _, _, ext = GetMerchantItemInfo(i)
+            name, price, quantity, extendedCost = n, p, q, ext
+        end
+        if name and wanted[name] and price and price > 0 and not extendedCost then
+            ProfGuideForeverDB.prices[name] = math.floor(price / math.max(quantity or 1, 1) + 0.5)
+        end
+    end
+end
+
 -- ---------- Opening a recipe in the profession window ----------
 
 -- Opens your profession window on a step's recipe. Uses the recipe's
@@ -602,7 +669,7 @@ local events = CreateFrame("Frame")
 for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL",
                      "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED", "TRADE_SKILL_SHOW",
                      "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED",
-                     "TRADE_SKILL_UPDATE" }) do
+                     "TRADE_SKILL_UPDATE", "MERCHANT_SHOW", "MERCHANT_UPDATE" }) do
     -- Some events only exist in some versions of WoW. Registering an
     -- unknown one is an error, so we try each safely and skip misses.
     pcall(events.RegisterEvent, events, e)
@@ -638,6 +705,9 @@ events:SetScript("OnEvent", function(self, event, arg1)
 
     if event == "BAG_UPDATE_DELAYED" or event == "BANKFRAME_OPENED" then
         pcall(ScanBags)
+    elseif event == "MERCHANT_SHOW" or event == "MERCHANT_UPDATE" then
+        local ok, err = pcall(ScanMerchant)
+        if not ok then print("|cffff5555ProfGuide Forever price error:|r " .. tostring(err)) end
     elseif event == "SKILL_LINES_CHANGED" or event == "CHAT_MSG_SKILL" then
         ns.state.viewIndex = nil -- skill moved: jump back to your current step
     elseif event:find("TRADE_SKILL") then
