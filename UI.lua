@@ -309,7 +309,12 @@ function UI:Build()
     else
         help:SetPoint("TOPRIGHT", -30, -4)
     end
-    help:SetFrameLevel(f:GetFrameLevel() + 10)
+    -- Same layer as the close button, so the window's border art
+    -- (which sits on a high layer) doesn't cover it.
+    local level = f:GetFrameLevel() + 10
+    if type(f.CloseButton) == "table" then level = math.max(level, f.CloseButton:GetFrameLevel()) end
+    if type(f.NineSlice) == "table" and f.NineSlice.GetFrameLevel then level = math.max(level, f.NineSlice:GetFrameLevel() + 1) end
+    help:SetFrameLevel(level)
     help:SetScript("OnClick", function() if ns.Welcome then ns.Welcome.Show() end end)
     help:SetScript("OnEnter", function(btn)
         GameTooltip:SetOwner(btn, "ANCHOR_TOP")

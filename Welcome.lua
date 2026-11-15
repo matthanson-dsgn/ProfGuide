@@ -22,7 +22,7 @@ local CONTENT = {
     { "item", "Snaps beside your profession window when you open it, and shows each recipe's skill-up colour." },
     { "item", "Fast or Budget routes, your nearest trainer, an Open recipe button, and costs: vendor prices, plus Auction House prices if you use TSM or Auctionator." },
     { "head", "Getting accurate data" },
-    { "item", "Open each of your profession windows once. This checks every recipe and its reagents against the game (you'll see \"Materials checked in game\")." },
+    { "item", "Open each of your profession windows once. This checks every recipe and its reagents against the game, and learns which recipes you know." },
     { "item", "Visit a trade goods vendor. This saves the real prices for thread, dye, salt and vials (the \"est.\" label disappears)." },
     { "item", "Carry or open an item once so its icon and count are recognised." },
     { "note", "Until you've done these, some reagents and prices may be estimates." },

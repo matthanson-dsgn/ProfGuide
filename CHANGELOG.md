@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.5 (15/11/2026)
+- Fix: the help button was hidden behind the window's border.
+- Updated a line in the welcome window to match the current design.
+
 ## 0.9.4 (15/11/2026)
 - Prices now show WoW's gold, silver and copper coin icons.
 - Fix: the welcome window could mark itself as seen before it appeared. It shows once more after this update.
