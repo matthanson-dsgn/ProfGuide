@@ -16,7 +16,7 @@ ns.SeedIDs = {
     -- Thread, dye & cloth
     ["Coarse Thread"] = 2320, ["Fine Thread"] = 2321, ["Silken Thread"] = 4291,
     ["Heavy Silken Thread"] = 8343, ["Rune Thread"] = 14341,
-    ["Gray Dye"] = 4340, ["Black Dye"] = 2325, ["Blue Dye"] = 6260, ["Orange Dye"] = 6261,
+    ["Gray Dye"] = 4340, ["Black Dye"] = 2325, ["Blue Dye"] = 6260, ["Orange Dye"] = 6261, ["Red Dye"] = 2604,
     ["Green Dye"] = 2605, ["Bleach"] = 2324,
     ["Linen Cloth"] = 2589, ["Wool Cloth"] = 2592, ["Silk Cloth"] = 4306,
     ["Mageweave Cloth"] = 4338, ["Runecloth"] = 14047,

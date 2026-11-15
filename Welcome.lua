@@ -20,6 +20,7 @@ local CONTENT = {
     { "item", "Shows the next recipe to craft from 1 to 300 and follows your skill as you level." },
     { "item", "Counts the reagents in your bags and bank, with a shopping list all the way to 300." },
     { "item", "Snaps beside your profession window when you open it, and shows each recipe's skill-up colour." },
+    { "item", "Gathering guides for Mining, Herbalism, Skinning and Fishing, plus a Characters tab with all your characters' professions." },
     { "item", "Fast or Budget routes, your nearest trainer, an Open recipe button, and costs: vendor prices, plus Auction House prices if you use TSM or Auctionator." },
     { "head", "Getting accurate data" },
     { "item", "Open each of your profession windows once. This checks every recipe and its reagents against the game, and learns which recipes you know." },

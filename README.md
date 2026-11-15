@@ -12,18 +12,19 @@ An in-game profession levelling guide for **World of Warcraft: Forever**. Stop t
 - Shows the total cost of vendor-bought ingredients (thread, dye, salt, vials...), learning real prices when you visit a vendor.
 - Snaps beside your profession window and shows each recipe's skill-up colour.
 - Auction House prices and a total cost to 300 if you use TSM or Auctionator.
+- Characters tab: all your characters' professions and skills.
 - "Step complete!" pop-up when you finish a step.
 - Settings page in Options > AddOns.
 - "Open recipe" jumps straight to the step's recipe in your profession window.
 - Shows which recipes you haven't learned yet, and your nearest trainer (click to open the map).
 
 ## Professions
-All crafting professions from 1 to 300: Alchemy, Blacksmithing, Enchanting, Engineering, Leatherworking and Tailoring, plus Cooking and First Aid.
+All crafting professions from 1 to 300: Alchemy, Blacksmithing, Enchanting, Engineering, Leatherworking and Tailoring, plus Cooking and First Aid. Gathering guides for Mining, Herbalism, Skinning and Fishing show the best zones at each skill level.
 
 The guide shows whichever profession window you open, and snaps beside it. Opened on its own, it shows the last profession you viewed.
 
 ## Fast or Budget
-Leatherworking has two routes. Switch between them with the **Fast | Budget** toggle on the panel:
+Leatherworking, Tailoring and Blacksmithing have two routes. Switch between them with the **Fast | Budget** toggle on the panel:
 - **Fast:** the fewest crafts. Some steps use pricier materials.
 - **Budget:** cheaper, common materials, for a similar number of crafts.
 

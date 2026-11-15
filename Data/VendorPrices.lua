@@ -13,6 +13,7 @@ ns.SeedPrices = {
     ["Gray Dye"] = 35,
     ["Black Dye"] = 2500,
     ["Blue Dye"] = 50,
+    ["Red Dye"] = 50,
     ["Green Dye"] = 100,
     ["Orange Dye"] = 2500,
     ["Bleach"] = 25,

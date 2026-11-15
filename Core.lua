@@ -30,6 +30,7 @@ local function MakeView(def, key, label, steps)
     local view = {
         name = def.name, skillLine = def.skillLine, icon = def.icon,
         rankNotes = def.rankNotes, routeKey = key, routeLabel = label, secondary = def.secondary,
+        gathering = def.gathering,
         steps = steps, recipeSet = {}, allRecipes = {},
     }
     -- recipeSet: things you make yourself on this route. Steps marked
@@ -97,6 +98,7 @@ local function InitDB()
     db.routes  = db.routes or {}    -- profession -> "fast" or "budget"
     db.known   = db.known or {}     -- character -> recipe name -> learned? (true/false)
     db.recipeIDs = db.recipeIDs or {} -- recipe name -> the game's recipe ID (for "Open recipe")
+    db.roster  = db.roster or {}    -- character -> class, level, professions (Characters tab)
     db.prices  = db.prices or {}    -- item name -> vendor price per item (copper), seen at a vendor
     db.difficulty = db.difficulty or {} -- character -> recipe -> { colour, skill when seen }
     if db.dock == nil then db.dock = true end -- snap beside the profession window
@@ -159,6 +161,24 @@ function ns.RecipeDifficulty(recipe)
     local d = t and t[recipe]
     if d then return d[1], d[2] end
 end
+
+-- ---------- Alt overview: every character's professions ----------
+
+-- Saves this character's class, level and professions, so the
+-- Characters tab can show all your characters together.
+function ns.SaveRoster()
+    local name = UnitName("player")
+    if not (ProfGuideForeverDB and name and name ~= UNKNOWNOBJECT) then return end
+    local _, classFile = UnitClass("player")
+    local profs = {}
+    for _, p in ipairs(ns.LearnedProfessions()) do profs[p.name] = { p.rank, p.max } end
+    ProfGuideForeverDB.roster[CharKey()] = {
+        name = name, realm = GetRealmName(), class = classFile,
+        level = UnitLevel("player"), profs = profs, seen = time(),
+    }
+end
+
+function ns.CurrentCharKey() return CharKey() end
 
 -- ---------- Reading your skill ----------
 -- Tries two ways: your professions list, then this character's own
@@ -427,7 +447,7 @@ end
 function ns.RecipeMats(step)
     local scanned = ProfGuideForeverDB and ProfGuideForeverDB.recipes[step.recipe]
     if scanned then return scanned, true end
-    return step.mats, false
+    return step.mats or {}, false -- gathering steps have no materials
 end
 
 -- Materials for one step: list of { name, need, have, crafted }.
@@ -615,7 +635,7 @@ local function ScanMerchant()
     for _, def in pairs(ns.Professions) do
         for _, view in pairs(def.views) do
             for _, step in ipairs(view.steps) do
-                for _, m in ipairs(step.mats) do wanted[m[1]] = true end
+                for _, m in ipairs(step.mats or {}) do wanted[m[1]] = true end
             end
         end
     end
@@ -807,6 +827,7 @@ local function QueueTradeSkillScan()
         local ok, err = pcall(ScanTradeSkill)
         if not ok then print("|cffff5555ProfGuide Forever scan error:|r " .. tostring(err)) end
         if ns.Toast then pcall(ns.Toast.CheckProgress) end
+        pcall(ns.SaveRoster)
         if ns.UI then ns.UI:Refresh() end
     end)
 end
@@ -825,7 +846,10 @@ events:SetScript("OnEvent", function(self, event, arg1)
         if ns.Minimap then ns.Minimap:Build() end
         if ns.Settings then pcall(ns.Settings.Build) end
         -- Note each profession's starting step, so the pop-up knows when you move on.
-        C_Timer.After(2, function() if ns.Toast then pcall(ns.Toast.CheckProgress) end end)
+        C_Timer.After(2, function()
+            if ns.Toast then pcall(ns.Toast.CheckProgress) end
+            pcall(ns.SaveRoster)
+        end)
         return
     end
 
@@ -837,6 +861,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "SKILL_LINES_CHANGED" or event == "CHAT_MSG_SKILL" then
         ns.state.viewIndex = nil -- skill moved: jump back to your current step
         if ns.Toast then pcall(ns.Toast.CheckProgress) end
+        pcall(ns.SaveRoster)
     elseif event:find("TRADE_SKILL") then
         QueueTradeSkillScan()
         return

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 (15/11/2026)
+- Budget routes for Tailoring (no elementals, essences or Loom-only patterns) and Blacksmithing (cheaper stone and bronze crafts up to 165).
+- Tip on the Fast Tailoring route: the Venomspew patterns need a Loom.
+- Gathering guides for Mining, Herbalism, Skinning and Fishing: what to gather at your skill and the best zones for your faction, nearest first. Click a zone to open the map.
+- New Characters tab: every character's class, level, professions and skill in one list.
+
 ## 0.10.0 (15/11/2026)
 - "Step complete!" pop-up with a sound when you finish a step, showing what to make next. Click it to open the guide.
 - Settings page in Options > AddOns: panel size, lock position, open beside profession windows, minimap button, pop-up and sound, plus Show welcome window and Reset position.

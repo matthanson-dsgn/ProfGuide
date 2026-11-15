@@ -57,6 +57,29 @@ local function PlayerPos()
     return continent, x, y, mapID
 end
 
+-- Distance from you to a zone (its middle): { dist, far, mapID }.
+-- dist = 0 means you're in it; far = it's on another continent.
+function Finder.ZoneInfo(zone)
+    if not zoneIndex then pcall(BuildZoneIndex) end
+    local info = {}
+    local z = zoneIndex and zoneIndex[zone]
+    info.mapID = z and z.mapID
+    local ok, continent, px, py, hereID = pcall(PlayerPos)
+    if not ok then return info end
+    local hereInfo = hereID and C_Map.GetMapInfo(hereID)
+    if hereInfo and hereInfo.name == zone then
+        info.dist = 0
+    elseif z and continent then
+        local tc, tx, ty = WorldPos(z.mapID, 0.5, 0.5)
+        if tc == continent and tx then
+            info.dist = math.sqrt((tx - px) ^ 2 + (ty - py) ^ 2)
+        else
+            info.far = true
+        end
+    end
+    return info
+end
+
 -- Returns up to `limit` trainers for your faction who can train you to
 -- at least `needSkill`, nearest first. Each: { name, zone, where, max, dist, far, mapID }
 function Finder.Nearest(profName, needSkill, limit)

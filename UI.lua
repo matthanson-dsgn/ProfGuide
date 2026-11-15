@@ -129,8 +129,26 @@ function UI:GetRow(i)
     r.badge:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     r:EnableMouse(true)
+    -- Zone rows open the map when clicked.
+    r:SetScript("OnMouseUp", function(row)
+        if row.kind == "zone" then ns.Finder.OpenMap({ mapID = row.mapID }) end
+    end)
     r:SetScript("OnEnter", function(row)
         GameTooltip:SetOwner(row, "ANCHOR_LEFT")
+        if row.kind == "zone" then
+            GameTooltip:AddLine(row.label, 1, 0.82, 0)
+            GameTooltip:AddLine("Click to open the map.", 1, 1, 1)
+            GameTooltip:Show()
+            return
+        elseif row.kind == "char" then
+            GameTooltip:AddLine(row.label, 1, 0.82, 0)
+            if row.seen then GameTooltip:AddLine("Last seen: " .. date("%d/%m/%Y", row.seen), 1, 1, 1) end
+            GameTooltip:Show()
+            return
+        elseif row.kind ~= "item" then
+            GameTooltip:Hide()
+            return
+        end
         local id = ns.ItemID(row.itemName)
         if id then
             GameTooltip:SetItemByID(id)
@@ -189,6 +207,8 @@ function UI:FillBox(label, list, y, craftedText, costList)
         r:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, rowsTop - (i - 1) * ROW_H)
 
         local ok = m.have >= m.need
+        r.kind = "item"
+        r.slot:Show()
         r.itemName = m.name
         r.need, r.have = m.need, m.have
         r.crafted = m.crafted
@@ -250,6 +270,42 @@ function UI:FillBox(label, list, y, craftedText, costList)
     else
         self.boxFooter:Hide()
     end
+    box:SetHeight(height)
+    box:Show()
+    return y - height
+end
+
+-- A plain list in the box (zones, characters). Each entry:
+-- { icon, text, right, rightColor, kind, label, mapID, seen, indent }
+function UI:FillList(label, entries, y)
+    local box = self.box
+    box:ClearAllPoints()
+    box:SetPoint("TOPLEFT", self.frame, "TOPLEFT", PAD, y)
+    self.boxLabel:SetText(label)
+    local rowsTop = -BOX_PAD - self.boxLabel:GetStringHeight() - 6
+
+    for i, e in ipairs(entries) do
+        local r = self:GetRow(i)
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD + (e.indent or 0), rowsTop - (i - 1) * ROW_H)
+        r.kind, r.label, r.mapID, r.seen = e.kind, e.label or e.text, e.mapID, e.seen
+        r.itemName, r.crafted = nil, false
+        r.icon:SetTexture(e.icon)
+        r.slot:SetShown(e.kind ~= "charprof")
+        r.badge:Hide()
+        r.check:SetShown(e.check or false)
+        r.count:SetText(e.right or "")
+        r.count:SetTextColor(unpack(e.rightColor or COLOR_MUTED))
+        r.name:SetText(e.text)
+        local maxW = ROW_W - 22 - 10 - r.count:GetStringWidth() - 8 - 14 - 6 - (e.indent or 0)
+        local textW = r.name.GetUnboundedStringWidth and r.name:GetUnboundedStringWidth() or r.name:GetStringWidth()
+        r.name:SetWidth(math.min(textW + 1, maxW))
+        r:Show()
+    end
+    for i = #entries + 1, #self.rows do self.rows[i]:Hide() end
+
+    self.boxFooter:Hide()
+    local height = -rowsTop + #entries * ROW_H + BOX_PAD - 4
     box:SetHeight(height)
     box:Show()
     return y - height
@@ -510,8 +566,8 @@ end
 -- ---------- Tabs under the window: This step / Shopping list ----------
 function UI:BuildPanelTabs()
     local f = self.frame
-    local labels = { "This step", "Shopping list" }
-    local keys = { "step", "shop" }
+    local labels = { "This step", "Shopping list", "Characters" }
+    local keys = { "step", "shop", "alts" }
     self.panelTabs = {}
     f.Tabs = {}
     for i, label in ipairs(labels) do
@@ -627,6 +683,14 @@ function UI:Draw()
     -- Empty state: this character has no professions yet.
     if not hasAny then
         HideContent(self)
+        if ns.state.tab == "alts" then -- the Characters tab still works
+            f:SetTitle("ProfGuide Forever")
+            self.routeToggle:Hide()
+            self.skillText:SetText(""); self.bar:SetValue(0)
+            if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, f, 3) end
+            f:SetHeight(-self:DrawCharacters(-INSET_TOP - 10) + 12 + INSET_BOTTOM)
+            return
+        end
         f:SetTitle("ProfGuide Forever")
         if f.SetPortraitToAsset then pcall(f.SetPortraitToAsset, f, "Interface\\AddOns\\ProfGuideForever\\Media\\MinimapIcon") end
         self.skillText:SetText("")
@@ -663,12 +727,19 @@ function UI:Draw()
 
     -- Bottom tabs
     local onStep = (ns.state.tab == "step")
-    if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, f, onStep and 1 or 2) end
+    local tabIndex = ({ step = 1, shop = 2, alts = 3 })[ns.state.tab] or 1
+    if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, f, tabIndex) end
 
     HideContent(self)
     local y = -INSET_TOP - 10
 
-    if onStep then
+    if ns.state.tab == "alts" then
+        y = self:DrawCharacters(y)
+    elseif onStep and prof.gathering then
+        y = self:DrawGatheringStep(prof, skill, maxSkill, current, y)
+    elseif not onStep and prof.gathering then
+        y = self:FillList("Gathering professions don't need materials. Just head to the zones on the This step tab.", {}, y)
+    elseif onStep then
         -- Clamp, in case you browsed a longer route or profession.
         local index = math.min(ns.state.viewIndex or current, #prof.steps)
         local step = prof.steps[index]
@@ -786,6 +857,111 @@ function UI:Draw()
     end
 
     f:SetHeight(-y + 12 + INSET_BOTTOM)
+end
+
+-- Characters tab: every character's professions and skill.
+function UI:DrawCharacters(y)
+    local roster = ProfGuideForeverDB.roster or {}
+    local me = ns.CurrentCharKey()
+    local keys = {}
+    for key in pairs(roster) do table.insert(keys, key) end
+    -- You first, then by name.
+    table.sort(keys, function(a, b)
+        if a == me then return true elseif b == me then return false end
+        return a < b
+    end)
+
+    local entries = {}
+    for _, key in ipairs(keys) do
+        local c = roster[key]
+        local colour = (RAID_CLASS_COLORS and c.class and RAID_CLASS_COLORS[c.class]) or { r = 1, g = 1, b = 1 }
+        local hex = string.format("|cff%02x%02x%02x", math.floor(colour.r * 255), math.floor(colour.g * 255), math.floor(colour.b * 255))
+        table.insert(entries, {
+            kind = "char", seen = c.seen,
+            icon = c.class and ("Interface\\Icons\\ClassIcon_" .. c.class) or 134400,
+            text = hex .. (c.name or key) .. "|r",
+            label = (c.name or key) .. " - " .. (c.realm or ""),
+            right = c.level and ("Level " .. c.level) or "",
+        })
+        local names = {}
+        for profName in pairs(c.profs or {}) do table.insert(names, profName) end
+        table.sort(names)
+        if #names == 0 then
+            table.insert(entries, { kind = "charprof", indent = 16, icon = nil, text = "|cff9d9d9dNo professions yet|r" })
+        end
+        for _, profName in ipairs(names) do
+            local p = c.profs[profName]
+            local def = ns.Professions[profName]
+            table.insert(entries, {
+                kind = "charprof", indent = 16,
+                icon = def and def.icon or 134400,
+                text = profName,
+                right = p[1] .. " / " .. p[2],
+                rightColor = (p[1] >= 300) and COLOR_OK or WHITE,
+                check = p[1] >= 300,
+            })
+        end
+    end
+    local label = (#keys > 0) and "Your characters:" or "Log in on each character once to see them here."
+    y = self:FillList(label, entries, y)
+    return y
+end
+
+-- Gathering step: what to gather and the best zones for your faction,
+-- nearest first. Click a zone to open the map.
+function UI:DrawGatheringStep(prof, skill, maxSkill, current, y)
+    local f = self.frame
+    local index = math.min(ns.state.viewIndex or current, #prof.steps)
+    local step = prof.steps[index]
+
+    local label = "STEP " .. index .. " OF " .. #prof.steps .. "   SKILL " .. step.from .. "-" .. step.to
+    if index ~= current then label = label .. "   (browsing)" end
+    Place(self.eyebrow, y); self.eyebrow:SetText(label)
+    y = y - self.eyebrow:GetStringHeight() - GAP_ABOVE_RECIPE
+
+    Place(self.recipe, y); self.recipe:SetText(step.recipe)
+    y = y - self.recipe:GetStringHeight() - 8
+
+    Place(self.meta, y)
+    self.meta:SetText("Gather until skill " .. step.to .. ".")
+    self.meta:SetTextColor(unpack(COLOR_MUTED))
+    y = y - self.meta:GetStringHeight() - GAP_BELOW_RECIPE
+
+    local lines = {}
+    if step.note then table.insert(lines, "Tip: " .. step.note) end
+    local rankTips, capped = ns.RankTips(prof, step, skill, maxSkill)
+    for _, t in ipairs(rankTips) do table.insert(lines, t) end
+    if capped and index == current then
+        table.insert(lines, "|cffff7a6bYou've hit your skill cap. Train the next rank to keep levelling.|r")
+    end
+    if #lines > 0 then
+        Place(self.note, y); self.note:SetText(table.concat(lines, "\n"))
+        y = y - self.note:GetStringHeight() - 12
+    end
+
+    -- Zones for your faction, nearest first.
+    local faction = UnitFactionGroup("player")
+    local zones = {}
+    for _, key in ipairs({ faction, "Both" }) do
+        for _, z in ipairs((step.zones and step.zones[key]) or {}) do table.insert(zones, z) end
+    end
+    local entries = {}
+    for _, z in ipairs(zones) do
+        local info = ns.Finder and ns.Finder.ZoneInfo(z) or {}
+        local dist = ns.Finder and ns.Finder.DistanceText(info) or ""
+        table.insert(entries, {
+            kind = "zone", icon = prof.icon, text = z, mapID = info.mapID,
+            right = dist, order = info.dist or (info.far and 1e8) or 1e9,
+        })
+    end
+    table.sort(entries, function(a, b) return a.order < b.order end)
+    y = self:FillList("Best zones for you:", entries, y)
+
+    self.prevBtn:Show(); self.nextBtn:Show(); self.currentBtn:Show()
+    self.prevBtn:SetEnabled(index > 1)
+    self.nextBtn:SetEnabled(index < #prof.steps)
+    self.currentBtn:SetEnabled(index ~= current)
+    return y
 end
 
 -- Puts the panel where you last left it (or the default spot).
