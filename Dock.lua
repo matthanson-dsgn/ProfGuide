@@ -56,7 +56,9 @@ function Dock.DockNow()
     if not Dock.active then Dock.autoOpened = not ui.frame:IsShown() end
     Dock.active = true
     ui.frame:ClearAllPoints()
-    ui.frame:SetPoint("TOPLEFT", host, "TOPRIGHT", 6, 0)
+    -- 50px gap: clears the profession window's own tabs down its right
+    -- edge, plus our round portrait, which pokes out to the left.
+    ui.frame:SetPoint("TOPLEFT", host, "TOPRIGHT", 50, 0)
     ui.frame:Show()
     ui:Refresh()
 

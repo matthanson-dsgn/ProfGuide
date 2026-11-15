@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.1 (15/11/2026)
+- Removed the profession tabs: the guide shows whichever profession window you open, or the last one you viewed.
+- Docks further right, so it no longer covers the profession window's own tabs.
+- Open recipe: also searches for the recipe and shows unlearned recipes, and says in chat if it can't.
+- Fix: a profession from another character could show up after switching characters. Primary professions now come only from your character's own professions list.
+- The "move on" tip no longer shows for recipes you haven't learned.
+
 ## 0.9.0 (15/11/2026)
 - Docks beside your profession window: opens automatically, switches to that profession, and goes back where it was when you close the window. `/pg dock` turns it on or off.
 - Auction House prices: with TSM or Auctionator installed, each reagents box shows the Auction House cost of what you still need, and the shopping list shows the total cost to 300.

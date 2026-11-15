@@ -433,7 +433,6 @@ function UI:Build()
     self.currentBtn:SetPoint("BOTTOM", 0, 3)
 
     self:BuildPanelTabs()
-    self.profTabs = {}
 
     f:SetShown(ProfGuideForeverDB.shown)
     self:Refresh()
@@ -516,66 +515,21 @@ function UI:BuildRouteToggle()
     end
 end
 
--- ---------- Profession tabs down the right edge ----------
--- Icon tabs like the classic spellbook. Only your professions.
-function UI:ProfTab(i)
-    if self.profTabs[i] then return self.profTabs[i] end
-    local t = CreateFrame("CheckButton", nil, self.frame)
-    t:SetSize(32, 32)
-    t:SetPoint("TOPLEFT", self.frame, "TOPRIGHT", 0, -50 - (i - 1) * 46)
-
-    -- The tab shape behind the icon (spellbook side tab art).
-    t.bg = t:CreateTexture(nil, "BACKGROUND")
-    t.bg:SetSize(64, 64)
-    t.bg:SetPoint("TOPLEFT", -3, 11)
-    t.bg:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
-
-    t.icon = t:CreateTexture(nil, "ARTWORK")
-    t.icon:SetAllPoints()
-    t:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-    -- Selected glow: our own texture, so we control its blend mode.
-    local checked = t:CreateTexture(nil, "OVERLAY")
-    checked:SetAllPoints()
-    checked:SetTexture("Interface\\Buttons\\CheckButtonHilight")
-    checked:SetBlendMode("ADD")
-    t:SetCheckedTexture(checked)
-
-    t:SetScript("OnClick", function(btn)
-        ns.state.prof = btn.profName
-        ns.state.viewIndex = nil
-        ProfGuideForeverDB.lastProf = btn.profName
-        UI:Refresh()
-    end)
-    t:SetScript("OnEnter", function(btn)
-        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(btn.profName, 1, 0.82, 0)
-        if btn.rank then GameTooltip:AddLine(btn.rank .. " / " .. btn.max, 1, 1, 1) end
-        GameTooltip:Show()
-    end)
-    t:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    self.profTabs[i] = t
-    return t
-end
-
--- Shows a tab for each profession you have; keeps the panel on one of them.
-function UI:UpdateProfTabs()
+-- ---------- Which profession to show ----------
+-- The guide follows the profession window you open (see Dock.lua).
+-- On its own it shows the last one you viewed, as long as this
+-- character has it; otherwise their first profession.
+function UI:EnsureLearnedProfession()
     local learned = ns.LearnedProfessions()
-    local current = ns.state.prof
-    local valid = false
-    for _, p in ipairs(learned) do if p.name == current then valid = true end end
-    if not valid and learned[1] then
+    for _, p in ipairs(learned) do
+        if p.name == ns.state.prof then return true end
+    end
+    if learned[1] then
         ns.state.prof = learned[1].name
         ns.state.viewIndex = nil
+        return true
     end
-    for i, p in ipairs(learned) do
-        local t = self:ProfTab(i)
-        t.profName, t.rank, t.max = p.name, p.rank, p.max
-        t.icon:SetTexture(ns.Professions[p.name].icon)
-        t:SetChecked(p.name == ns.state.prof)
-        t:Show()
-    end
-    for i = #learned + 1, #self.profTabs do self.profTabs[i]:Hide() end
-    return #learned > 0
+    return false
 end
 
 -- ---------- Drawing (runs whenever something changes) ----------
@@ -600,7 +554,7 @@ end
 
 function UI:Draw()
     local f = self.frame
-    local hasAny = self:UpdateProfTabs()
+    local hasAny = self:EnsureLearnedProfession()
 
     -- Empty state: this character has no professions yet.
     if not hasAny then
@@ -715,7 +669,7 @@ function UI:Draw()
         if capped and index == current then
             table.insert(lines, "|cffff7a6bYou've hit your skill cap. Train the next rank to keep levelling.|r")
         end
-        if index == current and (diffKey == "easy" or diffKey == "trivial") and index < #prof.steps then
+        if index == current and known ~= false and (diffKey == "easy" or diffKey == "trivial") and index < #prof.steps then
             table.insert(lines, "Skill-ups are " .. (diffKey == "easy" and "slowing down" or "over") .. " on this recipe. Consider moving to the next step.")
         end
         if #lines > 0 then

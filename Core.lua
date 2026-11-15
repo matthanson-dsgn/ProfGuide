@@ -29,7 +29,7 @@ local RANKS = {
 local function MakeView(def, key, label, steps)
     local view = {
         name = def.name, skillLine = def.skillLine, icon = def.icon,
-        rankNotes = def.rankNotes, routeKey = key, routeLabel = label,
+        rankNotes = def.rankNotes, routeKey = key, routeLabel = label, secondary = def.secondary,
         steps = steps, recipeSet = {}, allRecipes = {},
     }
     -- recipeSet: things you make yourself on this route. Steps marked
@@ -87,11 +87,11 @@ local function InitDB()
     if db.shown == nil then db.shown = true end
     db.itemIDs = db.itemIDs or {}   -- item name -> ID, learned in game
     db.recipes = db.recipes or {}   -- recipe name -> materials, read from profession windows
-    -- Skill numbers saved before 0.5.1 could belong to another character,
+    -- Skill numbers saved before 0.9.1 could belong to another character,
     -- so clear them once. They refill on login or when you open a profession.
-    if db.skillsVersion ~= 2 then
+    if db.skillsVersion ~= 3 then
         db.skills = {}
-        db.skillsVersion = 2
+        db.skillsVersion = 3
     end
     db.skills  = db.skills or {}    -- character -> profession -> { skill, max }
     db.routes  = db.routes or {}    -- profession -> "fast" or "budget"
@@ -170,6 +170,10 @@ function ns.GetSkill(prof)
             end
         end
     end
+
+    -- Primary professions (Leatherworking, Tailoring...) always appear in
+    -- the list above, so if it's not there, this character doesn't have it.
+    if not prof.secondary and GetProfessions then return nil end
 
     -- 2. What this character's own profession window told us last time
     --    (covers professions the list above leaves out, like First Aid).
@@ -281,7 +285,8 @@ local function ScanModern()
 
     -- Your skill in the open profession.
     local skillNow
-    if T.GetBaseProfessionInfo then
+    local windowOpen = (ProfessionsFrame and ProfessionsFrame:IsShown()) or (TradeSkillFrame and TradeSkillFrame:IsShown())
+    if T.GetBaseProfessionInfo and windowOpen then
         local base = T.GetBaseProfessionInfo()
         if base and base.professionName then
             RememberSkill(base.professionName, base.skillLevel, base.maxSkillLevel)
@@ -623,22 +628,48 @@ function ns.OpenRecipe(prof, step)
         print("|cffffd100ProfGuide Forever:|r can't open the profession window during combat.")
         return
     end
-    local id = ProfGuideForeverDB.recipeIDs[step.recipe]
-    if id and T and T.OpenRecipe then
-        if pcall(T.OpenRecipe, id) then return end
-    end
-    -- Fallback: open the profession, then search for the recipe by name.
-    if T and T.OpenTradeSkill then
-        pcall(T.OpenTradeSkill, prof.skillLine)
-    elseif CastSpellByName then
-        pcall(CastSpellByName, prof.name)
-    end
-    C_Timer.After(0.4, function()
+
+    -- Picks the recipe once the profession window is open: selects it by
+    -- ID, and also searches for its name with unlearned recipes shown, so
+    -- it's visible even if you haven't learned it yet.
+    local function SelectRecipe()
+        local done = false
+        local id = ProfGuideForeverDB.recipeIDs[step.recipe]
+        if id and T and T.OpenRecipe then
+            done = pcall(T.OpenRecipe, id) or done
+        end
+        if T and T.SetShowUnlearned then pcall(T.SetShowUnlearned, true) end
+        if T and T.SetRecipeItemNameFilter then
+            done = pcall(T.SetRecipeItemNameFilter, step.recipe) or done
+        end
         pcall(function()
-            local box = ProfessionsFrame.CraftingPage.RecipeList.SearchBox
-            box:SetText(step.recipe)
+            ProfessionsFrame.CraftingPage.RecipeList.SearchBox:SetText(step.recipe)
+            done = true
         end)
-    end)
+        pcall(function() -- Classic-style window
+            TradeSkillFrameSearchBox:SetText(step.recipe)
+            done = true
+        end)
+        if not done then
+            print("|cffffd100ProfGuide Forever:|r couldn't select the recipe. Search for \"" .. step.recipe .. "\" in your profession window (please report this).")
+        end
+    end
+
+    local open = (ProfessionsFrame and ProfessionsFrame:IsShown()) or (TradeSkillFrame and TradeSkillFrame:IsShown())
+    if open then
+        SelectRecipe()
+        return
+    end
+
+    -- Open the profession first, then select the recipe a moment later.
+    local opened = false
+    if T and T.OpenTradeSkill then opened = pcall(T.OpenTradeSkill, prof.skillLine) end
+    if not opened and CastSpellByName then opened = pcall(CastSpellByName, prof.name) end
+    if not opened then
+        print("|cffffd100ProfGuide Forever:|r couldn't open your " .. prof.name .. " window. Open it yourself, then click Open recipe again.")
+        return
+    end
+    C_Timer.After(0.5, SelectRecipe)
 end
 
 -- ---------- /pg check ----------
