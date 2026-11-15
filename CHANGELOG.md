@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.3 (15/11/2026)
+- Docks further right, clear of the profession window's tabs.
+- Open recipe is greyed out for recipes you haven't learned.
+- Hides when you switch to a profession it doesn't guide (Fishing, Skinning, Mining, Herbalism), and comes back when you switch back.
+
 ## 0.9.2 (15/11/2026)
 - Recipe name now uses the full width, with the Open recipe button on its own row underneath.
 - "Not learned yet" is now a red badge beside the Open recipe button (hover to see where to learn it).

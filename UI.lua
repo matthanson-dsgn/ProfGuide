@@ -357,10 +357,15 @@ function UI:Build()
     open:SetScript("OnEnter", function(btn)
         GameTooltip:SetOwner(btn, "ANCHOR_TOP")
         GameTooltip:AddLine("Open recipe", 1, 0.82, 0)
-        GameTooltip:AddLine("Opens your profession window on this recipe.", 1, 1, 1, true)
+        if btn.notLearned then
+            GameTooltip:AddLine("Learn this recipe first.", 1, 0.5, 0.45, true)
+        else
+            GameTooltip:AddLine("Opens your profession window on this recipe.", 1, 1, 1, true)
+        end
         GameTooltip:Show()
     end)
     open:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    if open.SetMotionScriptsWhileDisabled then open:SetMotionScriptsWhileDisabled(true) end -- tooltip even when greyed out
     self.openBtn = open
 
     -- Red "Not learned yet" badge, shown beside the Open recipe button.
@@ -643,7 +648,9 @@ function UI:Draw()
         local known = ns.IsKnown(step.recipe)
         self.openBtn:ClearAllPoints()
         self.openBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD - 2, y)
-        self.openBtn:SetEnabled(skill ~= nil) -- only for your own professions
+        -- Greyed out for professions or recipes you haven't learned.
+        self.openBtn:SetEnabled(skill ~= nil and known ~= false)
+        self.openBtn.notLearned = (known == false)
         self.openBtn:Show()
         if known == false then
             self.learnBadge.source = step.source

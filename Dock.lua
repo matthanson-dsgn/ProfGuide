@@ -35,7 +35,9 @@ function Dock.Undock()
     local f = ns.UI and ns.UI.frame
     if not f then return end
     ns.UI:RestorePosition()
-    if Dock.autoOpened then f:Hide() end -- we opened it, so we close it
+    -- Leave it how it was before the profession window opened.
+    f:SetShown(not Dock.autoOpened)
+    if f:IsShown() then ns.UI:Refresh() end
     Dock.autoOpened = false
 end
 
@@ -45,20 +47,27 @@ function Dock.DockNow()
     local ui = ns.UI
     if not (host and ui and ui.frame) then return end
 
-    -- Switch to the profession you just opened (if it's on our list).
     local name = OpenProfessionName()
-    if name and ns.Professions[name] and ns.state.prof ~= name then
+    if not Dock.active then Dock.autoOpened = not ui.frame:IsShown() end
+    Dock.active = true
+
+    -- A profession we don't guide (Fishing, Skinning, Mining...): hide.
+    if not (name and ns.Professions[name]) then
+        ui.frame:Hide()
+        return
+    end
+
+    -- Switch to the profession you just opened.
+    if ns.state.prof ~= name then
         ns.state.prof = name
         ns.state.viewIndex = nil
         ProfGuideForeverDB.lastProf = name
     end
 
-    if not Dock.active then Dock.autoOpened = not ui.frame:IsShown() end
-    Dock.active = true
     ui.frame:ClearAllPoints()
-    -- 50px gap: clears the profession window's own tabs down its right
+    -- 80px gap: clears the profession window's own tabs down its right
     -- edge, plus our round portrait, which pokes out to the left.
-    ui.frame:SetPoint("TOPLEFT", host, "TOPRIGHT", 50, 0)
+    ui.frame:SetPoint("TOPLEFT", host, "TOPRIGHT", 80, 0)
     ui.frame:Show()
     ui:Refresh()
 
@@ -70,16 +79,25 @@ function Dock.DockNow()
 end
 
 local events = CreateFrame("Frame")
-for _, e in ipairs({ "TRADE_SKILL_SHOW", "TRADE_SKILL_CLOSE" }) do
+-- DATA_SOURCE_CHANGED / LIST_UPDATE fire when you switch professions
+-- inside the open window (e.g. Leatherworking -> Fishing).
+for _, e in ipairs({ "TRADE_SKILL_SHOW", "TRADE_SKILL_CLOSE",
+                     "TRADE_SKILL_DATA_SOURCE_CHANGED", "TRADE_SKILL_LIST_UPDATE" }) do
     pcall(events.RegisterEvent, events, e)
 end
+local pending = false
 events:SetScript("OnEvent", function(_, event)
-    if event == "TRADE_SKILL_SHOW" then
-        -- Wait a moment so the profession window has finished opening.
-        C_Timer.After(0.1, function() pcall(Dock.DockNow) end)
-    else
+    if event == "TRADE_SKILL_CLOSE" then
         pcall(Dock.Undock)
+        return
     end
+    -- These fire in bursts: wait a moment, then check once.
+    if pending then return end
+    pending = true
+    C_Timer.After(0.15, function()
+        pending = false
+        if HostFrame() then pcall(Dock.DockNow) end
+    end)
 end)
 
 -- /pg dock: turn docking on or off.
