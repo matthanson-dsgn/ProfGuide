@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0 (15/11/2026)
+- Docks beside your profession window: opens automatically, switches to that profession, and goes back where it was when you close the window. `/pg dock` turns it on or off.
+- Auction House prices: with TSM or Auctionator installed, each reagents box shows the Auction House cost of what you still need, and the shopping list shows the total cost to 300.
+- Skill-up colours: each step shows the recipe's colour (orange, yellow, green or grey) from your last profession-window scan, with a tip to move on when it turns green or grey.
+
 ## 0.8.0 (15/11/2026)
 - Welcome window the first time the add-on opens: what it does, how its data becomes accurate, and handy commands.
 - Help button (i) in the title bar, and `/pg help`, to open it again.

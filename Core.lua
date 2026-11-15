@@ -98,6 +98,8 @@ local function InitDB()
     db.known   = db.known or {}     -- character -> recipe name -> learned? (true/false)
     db.recipeIDs = db.recipeIDs or {} -- recipe name -> the game's recipe ID (for "Open recipe")
     db.prices  = db.prices or {}    -- item name -> vendor price per item (copper), seen at a vendor
+    db.difficulty = db.difficulty or {} -- character -> recipe -> { colour, skill when seen }
+    if db.dock == nil then db.dock = true end -- snap beside the profession window
 end
 
 -- This character's part of a saved table (e.g. "skills"), created on demand.
@@ -123,6 +125,30 @@ end
 function ns.IsKnown(recipe)
     local known = CharTable("known")
     if known then return known[recipe] end
+end
+
+-- Skill-up colours, as WoW shows them in the profession window.
+ns.DIFFICULTY = {
+    optimal = { label = "Orange", hex = "ff8040", help = "guaranteed skill-up" },
+    medium  = { label = "Yellow", hex = "ffff00", help = "usually a skill-up" },
+    easy    = { label = "Green",  hex = "40c040", help = "skill-ups are rare" },
+    trivial = { label = "Grey",   hex = "808080", help = "no skill-ups" },
+}
+
+-- Modern clients give a number; these are its meanings.
+local DIFFICULTY_BY_NUMBER = { [0] = "optimal", [1] = "medium", [2] = "easy", [3] = "trivial" }
+
+local function RememberDifficulty(recipe, key, skill)
+    local t = CharTable("difficulty")
+    if t and recipe and key and ns.DIFFICULTY[key] then t[recipe] = { key, skill } end
+end
+
+-- A recipe's skill-up colour from your last profession-window scan,
+-- plus the skill you had at the time. nil if not seen yet.
+function ns.RecipeDifficulty(recipe)
+    local t = CharTable("difficulty")
+    local d = t and t[recipe]
+    if d then return d[1], d[2] end
 end
 
 -- ---------- Reading your skill ----------
@@ -254,10 +280,13 @@ local function ScanModern()
     local report = NewScanReport("modern")
 
     -- Your skill in the open profession.
+    local skillNow
     if T.GetBaseProfessionInfo then
         local base = T.GetBaseProfessionInfo()
         if base and base.professionName then
             RememberSkill(base.professionName, base.skillLevel, base.maxSkillLevel)
+            ns.openProfession = base.professionName
+            skillNow = base.skillLevel
         end
     end
 
@@ -273,6 +302,9 @@ local function ScanModern()
             local known = CharTable("known")
             if known then known[info.name] = info.learned and true or false end
             ProfGuideForeverDB.recipeIDs[info.name] = recipeID
+            if info.relativeDifficulty ~= nil then
+                RememberDifficulty(info.name, DIFFICULTY_BY_NUMBER[info.relativeDifficulty], skillNow)
+            end
             local schematic = T.GetRecipeSchematic(recipeID, false)
             local mats, complete = {}, true
             for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
@@ -307,9 +339,12 @@ local function ScanClassic()
     if count == 0 then return false end
     local report = NewScanReport("classic")
 
+    local skillNow
     if GetTradeSkillLine then
         local name, rank, maxRank = GetTradeSkillLine()
         RememberSkill(name, rank, maxRank)
+        ns.openProfession = name
+        skillNow = rank
     end
 
     local wanted = RouteRecipeNames()
@@ -323,6 +358,7 @@ local function ScanClassic()
                 report.matched = report.matched + 1
                 local known = CharTable("known")
                 if known then known[name] = true end -- this window only lists learned recipes
+                RememberDifficulty(name, kind, skillNow) -- kind is "optimal", "medium", "easy" or "trivial"
                 local mats, complete = {}, true
                 for j = 1, (GetTradeSkillNumReagents(i) or 0) do
                     local reagentName, _, amount = GetTradeSkillReagentInfo(i, j)
@@ -498,6 +534,44 @@ function ns.VendorCost(list)
         end
     end
     return total, estimated, count
+end
+
+-- ---------- Auction House prices (from TSM or Auctionator) ----------
+-- WoW doesn't give add-ons Auction House prices directly, so we borrow
+-- them from TSM or Auctionator if the player has one installed.
+
+function ns.PriceAddon()
+    if TSM_API and TSM_API.GetCustomPriceValue then return "TSM" end
+    if Auctionator and Auctionator.API and Auctionator.API.v1
+        and Auctionator.API.v1.GetAuctionPriceByItemID then return "Auctionator" end
+end
+
+-- Auction House price of one item in copper, or nil if unknown.
+function ns.AuctionPrice(name)
+    local id = ns.ItemID(name)
+    if not id then return nil end
+    if TSM_API and TSM_API.GetCustomPriceValue then
+        local ok, value = pcall(TSM_API.GetCustomPriceValue, "dbmarket", "i:" .. id)
+        if ok and value and value > 0 then return value end
+    end
+    if Auctionator and Auctionator.API and Auctionator.API.v1 and Auctionator.API.v1.GetAuctionPriceByItemID then
+        local ok, value = pcall(Auctionator.API.v1.GetAuctionPriceByItemID, "ProfGuideForever", id)
+        if ok and value and value > 0 then return value end
+    end
+end
+
+-- Auction House cost of what you still need, for items vendors don't
+-- sell and you don't craft yourself. Also counts items with no price.
+function ns.AuctionCost(list)
+    local total, unpriced = 0, 0
+    for _, m in ipairs(list) do
+        local missing = math.max(0, m.need - m.have)
+        if missing > 0 and not m.crafted and not ns.VendorPrice(m.name) then
+            local price = ns.AuctionPrice(m.name)
+            if price then total = total + missing * price else unpriced = unpriced + 1 end
+        end
+    end
+    return total, unpriced
 end
 
 -- Money as text with WoW's coin icons, e.g. 2g 34s 50c.
@@ -725,6 +799,7 @@ end)
 -- /pg minimap  hide or show the minimap button
 -- /pg trainers list the nearest trainers for the current profession
 -- /pg help     open the welcome / help window
+-- /pg dock     turn docking beside the profession window on or off
 SLASH_PROFGUIDEFOREVER1 = "/pgf"
 SLASH_PROFGUIDEFOREVER2 = "/pg"
 SLASH_PROFGUIDEFOREVER3 = "/profguide"
@@ -732,6 +807,8 @@ SlashCmdList.PROFGUIDEFOREVER = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
     if msg == "check" then
         Check()
+    elseif msg == "dock" then
+        if ns.Dock then ns.Dock.Toggle() end
     elseif msg == "help" then
         if ns.Welcome then ns.Welcome.Show() end
     elseif msg == "trainers" or msg == "trainer" then
@@ -739,6 +816,7 @@ SlashCmdList.PROFGUIDEFOREVER = function(msg)
     elseif msg == "minimap" then
         if ns.Minimap then ns.Minimap:Toggle() end
     elseif msg == "reset" then
+        if ns.Dock then ns.Dock.Undock() end
         ProfGuideForeverDB.pos = nil
         if ns.UI and ns.UI.frame then
             ns.UI.frame:ClearAllPoints()

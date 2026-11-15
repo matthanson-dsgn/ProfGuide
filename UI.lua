@@ -154,6 +154,16 @@ function UI:GetRow(i)
             if not real then
                 GameTooltip:AddLine("Estimate. Open a vendor that sells it to get the real price.", 0.62, 0.62, 0.62, true)
             end
+        elseif not row.crafted then
+            local ah = ns.AuctionPrice(row.itemName)
+            if ah then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddDoubleLine("Auction House (each)", ns.MoneyText(ah), 1, 0.82, 0, 1, 1, 1)
+                local missing = math.max(0, (row.need or 0) - (row.have or 0))
+                if missing > 0 then
+                    GameTooltip:AddDoubleLine("You need " .. missing .. " more", ns.MoneyText(missing * ah), 1, 1, 1, 1, 1, 1)
+                end
+            end
         end
         GameTooltip:Show()
     end)
@@ -164,7 +174,7 @@ function UI:GetRow(i)
 end
 
 -- Draws the reagents box at y. Returns the y position under it.
-function UI:FillBox(label, list, y, craftedText)
+function UI:FillBox(label, list, y, craftedText, costList)
     local prof = Prof()
     local box = self.box
     box:ClearAllPoints()
@@ -202,17 +212,37 @@ function UI:FillBox(label, list, y, craftedText)
 
     local height = -rowsTop + #list * ROW_H + BOX_PAD - 4
 
-    -- Vendor cost footer (only when there are shop-bought items).
-    local cost, estimated, vendorItems = ns.VendorCost(list)
+    -- Cost footer: vendor items, Auction House items, and (on the
+    -- shopping list) the total. Only lines that apply are shown.
+    local lines = {}
+    costList = costList or list
+    local vendorCost, estimated, vendorItems = ns.VendorCost(costList)
     if vendorItems > 0 then
-        local text
-        if cost > 0 then
-            text = "|cffffd100Vendor ingredients:|r " .. ns.MoneyText(cost)
-            if estimated then text = text .. "  |cff9d9d9d(est.)|r" end
+        if vendorCost > 0 then
+            table.insert(lines, "|cffffd100Vendor:|r " .. ns.MoneyText(vendorCost)
+                .. (estimated and "  |cff9d9d9d(est.)|r" or ""))
         else
-            text = "|cffffd100Vendor ingredients:|r |cff66d977all in your bags|r"
+            table.insert(lines, "|cffffd100Vendor:|r |cff66d977all in your bags|r")
         end
-        self.boxFooter:SetText(text)
+    end
+    local addon = ns.PriceAddon()
+    local ahCost, unpriced = 0, 0
+    if addon then
+        ahCost, unpriced = ns.AuctionCost(costList)
+        if ahCost > 0 or unpriced > 0 then
+            local text = "|cffffd100Auction House:|r " .. ns.MoneyText(ahCost) .. "  |cff9d9d9d(" .. addon .. ")|r"
+            if unpriced > 0 then text = text .. "  |cff9d9d9d" .. unpriced .. " unpriced|r" end
+            table.insert(lines, text)
+        end
+        if self.showTotal and (vendorCost + ahCost) > 0 then
+            table.insert(lines, "|cffffd100Total to 300:|r " .. ns.MoneyText(vendorCost + ahCost))
+        end
+    elseif self.showTotal then
+        table.insert(lines, "|cff9d9d9dInstall Auctionator or TSM to see Auction House prices.|r")
+    end
+
+    if #lines > 0 then
+        self.boxFooter:SetText(table.concat(lines, "\n"))
         self.boxFooter:ClearAllPoints()
         self.boxFooter:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, -(height - BOX_PAD + 10))
         self.boxFooter:Show()
@@ -241,18 +271,18 @@ function UI:Build()
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
+    -- While docked beside the profession window, it stays put.
+    f:SetScript("OnDragStart", function(frame)
+        if ns.Dock and ns.Dock.active then return end
+        frame:StartMoving()
+    end)
     f:SetScript("OnDragStop", function(frame)
         frame:StopMovingOrSizing()
+        if ns.Dock and ns.Dock.active then return end
         local point, _, relPoint, x, y = frame:GetPoint()
         ProfGuideForeverDB.pos = { point, relPoint, x, y }
     end)
-    local pos = ProfGuideForeverDB.pos
-    if pos then
-        f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
-    else
-        f:SetPoint("RIGHT", UIParent, "RIGHT", -120, 0)
-    end
+    self:RestorePosition()
     tinsert(UISpecialFrames, "ProfGuideForeverFrame") -- Esc closes it
 
     if type(f.CloseButton) == "table" then
@@ -639,8 +669,16 @@ function UI:Draw()
         local known = ns.IsKnown(step.recipe)
         local status = {}
         if known == false then table.insert(status, "|cffff9933Not learned yet|r") end
+        -- Skill-up colour from your last profession-window scan.
+        local diffKey, diffSkill = ns.RecipeDifficulty(step.recipe)
+        local diff = diffKey and ns.DIFFICULTY[diffKey]
+        if diff and known ~= false then
+            local text = "|cff" .. diff.hex .. diff.label .. "|r: " .. diff.help
+            if diffSkill and skill and diffSkill ~= skill then text = text .. " (at " .. diffSkill .. ")" end
+            table.insert(status, text)
+        end
         if verified then table.insert(status, "|cff66d977Materials checked in game|r") end
-        if #status > 0 then meta = meta .. "\n" .. table.concat(status, "    ") end
+        if #status > 0 then meta = meta .. "\n" .. table.concat(status, "\n") end
         Place(self.meta, y); self.meta:SetText(meta)
         self.meta:SetTextColor(unpack(COLOR_MUTED))
         y = y - self.meta:GetStringHeight()
@@ -677,11 +715,15 @@ function UI:Draw()
         if capped and index == current then
             table.insert(lines, "|cffff7a6bYou've hit your skill cap. Train the next rank to keep levelling.|r")
         end
+        if index == current and (diffKey == "easy" or diffKey == "trivial") and index < #prof.steps then
+            table.insert(lines, "Skill-ups are " .. (diffKey == "easy" and "slowing down" or "over") .. " on this recipe. Consider moving to the next step.")
+        end
         if #lines > 0 then
             Place(self.note, y); self.note:SetText(table.concat(lines, "\n"))
             y = y - self.note:GetStringHeight() - 12
         end
 
+        self.showTotal = false
         y = self:FillBox("Reagents:", mats, y, "You craft this in an earlier step.")
 
         self.prevBtn:Show(); self.nextBtn:Show(); self.currentBtn:Show()
@@ -697,7 +739,9 @@ function UI:Draw()
             for k = 1, MAX_ROWS do shown[k] = list[k] end
         end
         local label = (#list > 0) and "Everything to gather or buy from here to 300:" or "Nothing left to get. Nice work!"
-        y = self:FillBox(label, shown, y)
+        -- Costs use the full list, even if only the biggest rows are shown.
+        self.showTotal = true
+        y = self:FillBox(label, shown, y, nil, list)
 
         local ready = 0
         for _, m in ipairs(list) do
@@ -711,6 +755,17 @@ function UI:Draw()
     end
 
     f:SetHeight(-y + 12 + INSET_BOTTOM)
+end
+
+-- Puts the panel where you last left it (or the default spot).
+function UI:RestorePosition()
+    local f, pos = self.frame, ProfGuideForeverDB.pos
+    f:ClearAllPoints()
+    if pos then
+        f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+    else
+        f:SetPoint("RIGHT", UIParent, "RIGHT", -120, 0)
+    end
 end
 
 -- Show/hide. Pass true/false, or nothing to flip it.

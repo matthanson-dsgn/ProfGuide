@@ -19,7 +19,8 @@ local CONTENT = {
     { "head", "What it does" },
     { "item", "Shows the next recipe to craft from 1 to 300 and follows your skill as you level." },
     { "item", "Counts the reagents in your bags and bank, with a shopping list all the way to 300." },
-    { "item", "Fast or Budget routes, your nearest trainer, vendor costs, and an Open recipe button." },
+    { "item", "Snaps beside your profession window when you open it, and shows each recipe's skill-up colour." },
+    { "item", "Fast or Budget routes, your nearest trainer, an Open recipe button, and costs: vendor prices, plus Auction House prices if you use TSM or Auctionator." },
     { "head", "Getting accurate data" },
     { "item", "Open each of your profession windows once. This checks every recipe and its reagents against the game (you'll see \"Materials checked in game\")." },
     { "item", "Visit a trade goods vendor. This saves the real prices for thread, dye, salt and vials (the \"est.\" label disappears)." },
@@ -29,6 +30,7 @@ local CONTENT = {
     { "item", "/pg or the minimap button: open or close the guide" },
     { "item", "/pg trainers: list your nearest trainers" },
     { "item", "/pg check: check the guide against the game" },
+    { "item", "/pg dock: turn snapping beside the profession window on or off" },
     { "note", "Open this window again any time with the help button on the guide, or /pg help." },
 }
 
