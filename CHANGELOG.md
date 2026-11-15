@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2 (15/11/2026)
+- Recipe name now uses the full width, with the Open recipe button on its own row underneath.
+- "Not learned yet" is now a red badge beside the Open recipe button (hover to see where to learn it).
+- Removed the "Materials checked in game" label.
+- More spacing in the step details.
+
 ## 0.9.1 (15/11/2026)
 - Removed the profession tabs: the guide shows whichever profession window you open, or the last one you viewed.
 - Docks further right, so it no longer covers the profession window's own tabs.

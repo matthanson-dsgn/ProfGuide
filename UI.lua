@@ -363,6 +363,30 @@ function UI:Build()
     open:SetScript("OnLeave", function() GameTooltip:Hide() end)
     self.openBtn = open
 
+    -- Red "Not learned yet" badge, shown beside the Open recipe button.
+    local badge = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    badge:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+    badge:SetBackdropColor(0.45, 0.05, 0.05, 0.9)
+    badge:SetBackdropBorderColor(0.9, 0.25, 0.2, 1)
+    badge.text = NewText(badge, "GameFontHighlightSmall", "CENTER")
+    badge.text:SetPoint("CENTER")
+    badge.text:SetText("Not learned yet")
+    badge:SetSize(badge.text:GetStringWidth() + 16, 20)
+    badge:EnableMouse(true)
+    badge:SetScript("OnEnter", function(b)
+        GameTooltip:SetOwner(b, "ANCHOR_TOP")
+        GameTooltip:AddLine("Not learned yet", 1, 0.82, 0)
+        GameTooltip:AddLine("Learn this recipe from: " .. (b.source or "a trainer"), 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    badge:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    badge:Hide()
+    self.learnBadge = badge
+
+    -- Extra line spacing so the details aren't cramped.
+    self.meta:SetSpacing(4)
+    self.note:SetSpacing(3)
+
     -- "Nearest trainer" line: click to open the map, hover for more.
     local tb = CreateFrame("Button", nil, f)
     tb:SetSize(INNER_W, 16)
@@ -547,7 +571,7 @@ end
 
 local function HideContent(self)
     self.eyebrow:Hide(); self.recipe:Hide(); self.meta:Hide(); self.note:Hide()
-    self.trainerBtn:Hide(); self.openBtn:Hide(); self.box:Hide(); self.empty:Hide()
+    self.trainerBtn:Hide(); self.openBtn:Hide(); self.learnBadge:Hide(); self.box:Hide(); self.empty:Hide()
     self.prevBtn:Hide(); self.nextBtn:Hide(); self.currentBtn:Hide(); self.summary:Hide()
     for _, r in ipairs(self.rows) do r:Hide() end
 end
@@ -611,18 +635,26 @@ function UI:Draw()
         Place(self.eyebrow, y); self.eyebrow:SetText(label)
         y = y - self.eyebrow:GetStringHeight() - GAP_ABOVE_RECIPE
 
-        -- Recipe name with the "Open recipe" button beside it.
-        Place(self.recipe, y, INNER_W - OPEN_W - 8); self.recipe:SetText(step.recipe)
+        -- Recipe name on its own, full width.
+        Place(self.recipe, y); self.recipe:SetText(step.recipe)
+        y = y - self.recipe:GetStringHeight() - 8
+
+        -- Button row: Open recipe, plus a red badge if you haven't learned it.
+        local known = ns.IsKnown(step.recipe)
         self.openBtn:ClearAllPoints()
-        self.openBtn:SetPoint("TOPRIGHT", f, "TOPLEFT", PAD + INNER_W, y + 2)
+        self.openBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD - 2, y)
         self.openBtn:SetEnabled(skill ~= nil) -- only for your own professions
         self.openBtn:Show()
-        y = y - math.max(self.recipe:GetStringHeight(), 18) - GAP_IN_RECIPE
+        if known == false then
+            self.learnBadge.source = step.source
+            self.learnBadge:ClearAllPoints()
+            self.learnBadge:SetPoint("LEFT", self.openBtn, "RIGHT", 8, 0)
+            self.learnBadge:Show()
+        end
+        y = y - 22 - 12
 
         local meta = "Make about " .. crafts .. ".  Learn from: " .. step.source
-        local known = ns.IsKnown(step.recipe)
         local status = {}
-        if known == false then table.insert(status, "|cffff9933Not learned yet|r") end
         -- Skill-up colour from your last profession-window scan.
         local diffKey, diffSkill = ns.RecipeDifficulty(step.recipe)
         local diff = diffKey and ns.DIFFICULTY[diffKey]
@@ -631,7 +663,6 @@ function UI:Draw()
             if diffSkill and skill and diffSkill ~= skill then text = text .. " (at " .. diffSkill .. ")" end
             table.insert(status, text)
         end
-        if verified then table.insert(status, "|cff66d977Materials checked in game|r") end
         if #status > 0 then meta = meta .. "\n" .. table.concat(status, "\n") end
         Place(self.meta, y); self.meta:SetText(meta)
         self.meta:SetTextColor(unpack(COLOR_MUTED))
@@ -653,7 +684,7 @@ function UI:Draw()
             self.trainerBtn.trainers = trainers
             self.trainerBtn.text:SetText("|cffffd100Nearest trainer:|r " .. e.name .. ", " .. e.zone
                 .. (dist ~= "" and ("  |cff9d9d9d(" .. dist .. ")|r") or ""))
-            y = y - 6
+            y = y - 10
             self.trainerBtn:ClearAllPoints()
             self.trainerBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
             self.trainerBtn:SetHeight(self.trainerBtn.text:GetStringHeight())
