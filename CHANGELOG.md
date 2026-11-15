@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 (15/11/2026)
+- New WoW-style window: profession portrait, title bar, skill bar, inset content area and "Reagents" box.
+- "This step" and "Shopping list" are now proper WoW tabs under the window.
+- Profession icon tabs down the right edge replace the dropdown. Only your character's professions are shown.
+- "Open recipe" button opens your profession window on the current step's recipe.
+- Characters with no professions see a short "visit a trainer" message.
+
 ## 0.5.1 (14/11/2026)
 - Fix: after switching characters, the profession list could show the previous character's skills. Saved skill numbers are cleared once and refill as you play.
 - Per-character data is only saved once the character's name is known.

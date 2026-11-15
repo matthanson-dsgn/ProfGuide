@@ -1,8 +1,17 @@
 -- ============================================================
 -- UI.lua
--- The "component" layer: builds the panel and draws whatever
--- Core.lua works out. Layout uses a 14px outer padding and
--- 24px material rows.
+-- The "component" layer: builds the panel in WoW's own style and
+-- draws whatever Core.lua works out.
+--
+-- Structure (like a WoW window):
+--   Frame with portrait (profession icon), title and close button
+--   Header row: skill bar + Fast/Budget switch
+--   Inset: step details, nearest trainer, tips, reagents box
+--   Bottom bar: Prev / My step / Next
+--   Tabs under the frame: This step / Shopping list
+--   Icon tabs on the right edge: your professions
+-- WoW's built-in templates are used where available; if one is
+-- missing, a simple fallback is drawn instead so nothing breaks.
 -- ============================================================
 
 local addonName, ns = ...
@@ -11,33 +20,26 @@ local UI = {}
 ns.UI = UI
 
 -- ---------- Design tokens ----------
-local WIDTH   = 300
-local PAD     = 14
-local ROW_H   = 24
-local INNER_W = WIDTH - PAD * 2
-local BOX_PAD = 10                     -- padding inside the materials box
-local ROW_W   = INNER_W - BOX_PAD * 2  -- row width inside the box
+local WIDTH    = 338
+local INSET_L, INSET_R, INSET_TOP, INSET_BOTTOM = 4, 6, 58, 26
+local PAD      = INSET_L + 10                  -- content's left edge
+local INNER_W  = WIDTH - INSET_L - INSET_R - 20 -- content width
+local ROW_H    = 26
+local BOX_PAD  = 10
+local ROW_W    = INNER_W - BOX_PAD * 2
+local OPEN_W   = 92                            -- "Open recipe" button width
 
--- Vertical rhythm around the recipe block
-local GAP_ABOVE_RECIPE = 12 -- eyebrow -> recipe name
-local GAP_IN_RECIPE    = 4  -- recipe name -> "Make about..." (kept tight: one group)
-local GAP_BELOW_RECIPE = 18 -- recipe block -> tip / materials box
+local GAP_ABOVE_RECIPE = 10
+local GAP_IN_RECIPE    = 4
+local GAP_BELOW_RECIPE = 16
 
-local COLOR_OK    = { 0.40, 0.85, 0.45 } -- have enough
-local COLOR_SHORT = { 1.00, 0.50, 0.45 } -- still need more
+local GOLD        = { 1, 0.82, 0 }
+local WHITE       = { 1, 1, 1 }
+local COLOR_OK    = { 0.40, 0.85, 0.45 }
+local COLOR_SHORT = { 1.00, 0.50, 0.45 }
 local COLOR_MUTED = { 0.62, 0.62, 0.62 }
-local COLOR_BAR   = { 0.80, 0.52, 0.22 } -- leather brown-orange
 
 local function Prof() return ns.ActiveProf() end
-
--- Puts a text element at a vertical position, full width,
--- so long text wraps instead of running off the panel.
-local function Place(fs, y)
-    fs:ClearAllPoints()
-    fs:SetPoint("TOPLEFT", UI.frame, "TOPLEFT", PAD, y)
-    fs:SetWidth(INNER_W)
-    fs:Show()
-end
 
 local function NewText(parent, font, justify)
     local fs = parent:CreateFontString(nil, "OVERLAY", font)
@@ -46,22 +48,68 @@ local function NewText(parent, font, justify)
     return fs
 end
 
--- ---------- Material rows ----------
--- Rows are made once and reused (a "pool"), like recycling
--- list cells in a mobile app.
+-- Puts a text element at a vertical position inside the inset.
+local function Place(fs, y, width)
+    fs:ClearAllPoints()
+    fs:SetPoint("TOPLEFT", UI.frame, "TOPLEFT", PAD, y)
+    fs:SetWidth(width or INNER_W)
+    fs:Show()
+end
+
+-- Tries to create a frame from one of WoW's templates; returns nil if
+-- that template doesn't exist in this version of the game.
+local function TryCreate(kind, name, parent, template)
+    local ok, frame = pcall(CreateFrame, kind, name, parent, template)
+    if ok then return frame end
+end
+
+-- ---------- The window ----------
+
+-- WoW-style window: stone frame, round portrait, title, close button.
+local function CreateWindow()
+    local f = TryCreate("Frame", "ProfGuideForeverFrame", UIParent, "ButtonFrameTemplate")
+    if f and f.SetTitle then
+        f.wowStyle = true
+        if type(f.Inset) == "table" then
+            f.Inset:ClearAllPoints()
+            f.Inset:SetPoint("TOPLEFT", INSET_L, -INSET_TOP)
+            f.Inset:SetPoint("BOTTOMRIGHT", -INSET_R, INSET_BOTTOM)
+        end
+        return f
+    end
+
+    -- Fallback: the flat panel from earlier versions.
+    f = CreateFrame("Frame", "ProfGuideForeverFrame", UIParent, "BackdropTemplate")
+    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+    f:SetBackdropColor(0.06, 0.06, 0.07, 0.94)
+    f:SetBackdropBorderColor(0.35, 0.27, 0.18, 1)
+    f.TitleText = NewText(f, "GameFontNormal", "CENTER")
+    f.TitleText:SetPoint("TOP", 0, -6)
+    function f:SetTitle(text) self.TitleText:SetText(text) end
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", 2, 2)
+    f.CloseButton = close
+    return f
+end
+
+-- ---------- Reagent rows ----------
+-- Made once and reused (a "pool"), like recycled list cells.
 function UI:GetRow(i)
     if self.rows[i] then return self.rows[i] end
 
-    -- Rows live inside the materials box, so they draw on top of it.
     local r = CreateFrame("Frame", nil, self.box)
     r:SetSize(ROW_W, ROW_H)
 
     r.icon = r:CreateTexture(nil, "ARTWORK")
-    r.icon:SetSize(18, 18)
-    r.icon:SetPoint("LEFT")
-    r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) -- trims the icon's built-in border
+    r.icon:SetSize(20, 20)
+    r.icon:SetPoint("LEFT", 2, 0)
 
-    -- Tick icon, so "done" doesn't rely on colour alone.
+    -- Slot border, like an item button in your bags.
+    r.slot = r:CreateTexture(nil, "OVERLAY")
+    r.slot:SetSize(36, 36)
+    r.slot:SetPoint("CENTER", r.icon, "CENTER")
+    r.slot:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+
     r.check = r:CreateTexture(nil, "OVERLAY")
     r.check:SetSize(14, 14)
     r.check:SetPoint("RIGHT")
@@ -72,17 +120,14 @@ function UI:GetRow(i)
     r.count:SetWordWrap(false)
 
     r.name = NewText(r, "GameFontHighlight", "LEFT")
-    r.name:SetPoint("LEFT", r.icon, "RIGHT", 8, 0)
-    r.name:SetWordWrap(false) -- width is set per row in FillBox, so the badge can hug the text
+    r.name:SetPoint("LEFT", r.icon, "RIGHT", 10, 0)
+    r.name:SetWordWrap(false)
 
-    -- "You make this" badge: a tiny profession icon after the name.
     r.badge = r:CreateTexture(nil, "OVERLAY")
     r.badge:SetSize(12, 12)
     r.badge:SetPoint("LEFT", r.name, "RIGHT", 5, 0)
     r.badge:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    -- Hover anywhere on the row to see the item tooltip.
-    -- (The whole row is the hover target: easier than a 12px icon.)
     r:EnableMouse(true)
     r:SetScript("OnEnter", function(row)
         GameTooltip:SetOwner(row, "ANCHOR_LEFT")
@@ -105,9 +150,7 @@ function UI:GetRow(i)
     return r
 end
 
--- Draws the materials box at position y: a small label, then one
--- row per { name, need, have, crafted }. Returns the y under the box.
--- craftedText = tooltip line for things you make yourself.
+-- Draws the reagents box at y. Returns the y position under it.
 function UI:FillBox(label, list, y, craftedText)
     local prof = Prof()
     local box = self.box
@@ -122,34 +165,27 @@ function UI:FillBox(label, list, y, craftedText)
         r:ClearAllPoints()
         r:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD, rowsTop - (i - 1) * ROW_H)
 
-        local name, crafted = m.name, m.crafted
-
         local ok = m.have >= m.need
-        r.itemName = name
-        r.crafted = crafted
+        r.itemName = m.name
+        r.crafted = m.crafted
         r.craftedText = craftedText
-        r.icon:SetTexture(ns.ItemIcon(name))
-        r.badge:SetTexture(prof.icon)
+        r.icon:SetTexture(ns.ItemIcon(m.name))
         r.count:SetText(m.have .. " / " .. m.need)
         r.count:SetTextColor(unpack(ok and COLOR_OK or COLOR_SHORT))
         r.check:SetShown(ok)
-        r.badge:SetShown(crafted)
+        r.badge:SetShown(m.crafted)
+        r.badge:SetTexture(prof.icon)
 
-        -- Size the name to its text, but never wider than the space
-        -- left after the icon, count, tick and (if shown) badge.
-        r.name:SetText(name)
-        local maxW = ROW_W - 18 - 8 - r.count:GetStringWidth() - 8 - 14 - 6
-        if crafted then maxW = maxW - 17 end
-        local textW = r.name.GetUnboundedStringWidth and r.name:GetUnboundedStringWidth()
-            or r.name:GetStringWidth()
+        -- Name sized to its text, never wider than the space left.
+        r.name:SetText(m.name)
+        local maxW = ROW_W - 22 - 10 - r.count:GetStringWidth() - 8 - 14 - 6
+        if m.crafted then maxW = maxW - 17 end
+        local textW = r.name.GetUnboundedStringWidth and r.name:GetUnboundedStringWidth() or r.name:GetStringWidth()
         r.name:SetWidth(math.min(textW + 1, maxW))
         r:Show()
     end
-    -- Hide leftover rows from a longer list.
     for i = #list + 1, #self.rows do self.rows[i]:Hide() end
 
-    -- Box height = label + rows + padding (rows have built-in air,
-    -- so the bottom padding is a little smaller than the top).
     local height = -rowsTop + #list * ROW_H + BOX_PAD - 4
     box:SetHeight(height)
     box:Show()
@@ -161,20 +197,12 @@ function UI:Build()
     if self.frame then return end
     self.rows = {}
 
-    local f = CreateFrame("Frame", "ProfGuideForeverFrame", UIParent, "BackdropTemplate")
+    local f = CreateWindow()
     self.frame = f
-    f:SetSize(WIDTH, 300)
+    f:SetSize(WIDTH, 400)
     f:SetFrameStrata("MEDIUM")
     f:SetClampedToScreen(true)
-
-    -- Flat dark panel with a thin warm border.
-    f:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    f:SetBackdropColor(0.06, 0.06, 0.07, 0.94)
-    f:SetBackdropBorderColor(0.35, 0.27, 0.18, 1)
+    f:SetToplevel(true)
 
     -- Drag to move; remember where you left it.
     f:SetMovable(true)
@@ -190,91 +218,64 @@ function UI:Build()
     if pos then
         f:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
     else
-        f:SetPoint("RIGHT", UIParent, "RIGHT", -80, 0)
+        f:SetPoint("RIGHT", UIParent, "RIGHT", -120, 0)
+    end
+    tinsert(UISpecialFrames, "ProfGuideForeverFrame") -- Esc closes it
+
+    if type(f.CloseButton) == "table" then
+        f.CloseButton:SetScript("OnClick", function() UI:Toggle(false) end)
     end
 
-    -- Esc closes the panel, like other game windows.
-    tinsert(UISpecialFrames, "ProfGuideForeverFrame")
+    -- Fallback panels have no portrait, so content starts further left.
+    local headerX = f.wowStyle and 62 or PAD
 
-    -- Header: profession picker. Icon + name + down arrow, as one button.
-    local picker = CreateFrame("Button", nil, f)
-    picker:SetPoint("TOPLEFT", PAD, -PAD + 3)
-    picker:SetHeight(22)
-    self.picker = picker
-
-    self.profIcon = picker:CreateTexture(nil, "ARTWORK")
-    self.profIcon:SetSize(18, 18)
-    self.profIcon:SetPoint("LEFT")
-    self.profIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    self.title = NewText(picker, "GameFontNormalLarge")
-    self.title:SetPoint("LEFT", self.profIcon, "RIGHT", 6, 0)
-    self.title:SetWordWrap(false)
-
-    self.arrow = picker:CreateTexture(nil, "ARTWORK")
-    self.arrow:SetSize(12, 12)
-    self.arrow:SetPoint("LEFT", self.title, "RIGHT", 6, -1)
-    self.arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    self.arrow:SetRotation(-math.pi / 2) -- point it downwards
-
-    -- Hover: name turns white, so it reads as clickable.
-    picker:SetScript("OnEnter", function() self.title:SetTextColor(1, 1, 1) end)
-    picker:SetScript("OnLeave", function() self.title:SetTextColor(1, 0.82, 0) end)
-    picker:SetScript("OnClick", function() UI:ToggleMenu() end)
-
-    self:BuildMenu()
-
-    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", 2, 2)
-    close:SetScript("OnClick", function() UI:Toggle(false) end)
-
-    self.skillText = NewText(f, "GameFontHighlight", "RIGHT")
-    self.skillText:SetPoint("TOPRIGHT", -34, -PAD - 2)
-
-    -- Progress bar towards 300
-    local bar = CreateFrame("StatusBar", nil, f)
-    bar:SetPoint("TOPLEFT", PAD, -40)
-    bar:SetPoint("TOPRIGHT", -PAD, -40)
-    bar:SetHeight(6)
-    bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8x8")
-    bar:SetStatusBarColor(unpack(COLOR_BAR))
+    -- Skill bar, like the rank bar in the profession window.
+    local barWrap = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    barWrap:SetPoint("TOPLEFT", headerX, -30)
+    barWrap:SetSize(WIDTH - headerX - 126, 16)
+    barWrap:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    barWrap:SetBackdropColor(0, 0, 0, 0.6)
+    barWrap:SetBackdropBorderColor(0.75, 0.6, 0.35, 1)
+    local bar = CreateFrame("StatusBar", nil, barWrap)
+    bar:SetPoint("TOPLEFT", 3, -3)
+    bar:SetPoint("BOTTOMRIGHT", -3, 3)
+    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar:SetStatusBarColor(0.15, 0.55, 0.15) -- WoW's skill-bar green
     bar:SetMinMaxValues(0, 300)
-    local barBg = bar:CreateTexture(nil, "BACKGROUND")
-    barBg:SetAllPoints()
-    barBg:SetColorTexture(1, 1, 1, 0.08)
     self.bar = bar
-
-    -- Tabs: text with a gold underline on the active one
-    local function MakeTab(label, key)
-        local b = CreateFrame("Button", nil, f)
-        b.text = NewText(b, "GameFontNormal")
-        b.text:SetPoint("LEFT")
-        b.text:SetText(label)
-        b:SetSize(b.text:GetStringWidth() + 2, 20)
-        b.line = b:CreateTexture(nil, "ARTWORK")
-        b.line:SetColorTexture(1, 0.82, 0, 1)
-        b.line:SetHeight(2)
-        b.line:SetPoint("TOPLEFT", b.text, "BOTTOMLEFT", 0, -3)
-        b.line:SetPoint("TOPRIGHT", b.text, "BOTTOMRIGHT", 0, -3)
-        b:SetScript("OnClick", function()
-            ns.state.tab = key
-            UI.menu:Hide()
-            UI:Refresh()
-        end)
-        return b
-    end
-    self.tabStep = MakeTab("This step", "step")
-    self.tabStep:SetPoint("TOPLEFT", PAD, -56)
-    self.tabShop = MakeTab("Shopping list", "shop")
-    self.tabShop:SetPoint("LEFT", self.tabStep, "RIGHT", 20, 0)
+    self.skillText = NewText(bar, "GameFontHighlightSmall", "CENTER")
+    self.skillText:SetPoint("CENTER", 0, 0)
 
     self:BuildRouteToggle()
 
-    -- Content text
+    -- Content inside the inset
     self.eyebrow = NewText(f, "GameFontDisableSmall")
-    self.recipe  = NewText(f, "GameFontHighlightLarge")
+    self.recipe  = NewText(f, "GameFontNormalLarge") -- gold, like recipe names in game
     self.meta    = NewText(f, "GameFontHighlightSmall")
-    self.note    = NewText(f, "GameFontNormalSmall") -- gold, reads as a tip
+    self.note    = NewText(f, "GameFontNormalSmall")
+    self.empty   = NewText(f, "GameFontHighlight", "CENTER")
+
+    -- "Open recipe": jumps to the recipe in your profession window.
+    local open = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    open:SetSize(OPEN_W, 20)
+    open:SetText("Open recipe")
+    open:SetScript("OnClick", function()
+        local prof = Prof()
+        local index = math.min(ns.state.viewIndex or ns.CurrentStepIndex(prof, (ns.GetSkill(prof))), #prof.steps)
+        ns.OpenRecipe(prof, prof.steps[index])
+    end)
+    open:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:AddLine("Open recipe", 1, 0.82, 0)
+        GameTooltip:AddLine("Opens your profession window on this recipe.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    open:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.openBtn = open
 
     -- "Nearest trainer" line: click to open the map, hover for more.
     local tb = CreateFrame("Button", nil, f)
@@ -284,7 +285,7 @@ function UI:Build()
     tb.text:SetWidth(INNER_W)
     tb:SetScript("OnClick", function(btn) ns.Finder.OpenMap(btn.trainers and btn.trainers[1]) end)
     tb:SetScript("OnEnter", function(btn)
-        btn.text:SetAlpha(0.75) -- hover feedback
+        btn.text:SetAlpha(0.75)
         GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Nearest trainers", 1, 0.82, 0)
         for _, e in ipairs(btn.trainers or {}) do
@@ -299,26 +300,26 @@ function UI:Build()
     tb:SetScript("OnLeave", function(btn) btn.text:SetAlpha(1); GameTooltip:Hide() end)
     tb:Hide()
     self.trainerBtn = tb
-    -- Materials box: faint fill + 1px border so it reads as its own card.
+
+    -- Reagents box: dark fill with a soft gold edge.
     local box = CreateFrame("Frame", nil, f, "BackdropTemplate")
     box:SetWidth(INNER_W)
     box:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
     })
-    box:SetBackdropColor(1, 1, 1, 0.04)
-    box:SetBackdropBorderColor(1, 1, 1, 0.12)
+    box:SetBackdropColor(0, 0, 0, 0.35)
+    box:SetBackdropBorderColor(0.6, 0.5, 0.3, 0.9)
     self.box = box
-
-    self.boxLabel = NewText(box, "GameFontDisableSmall")
+    self.boxLabel = NewText(box, "GameFontNormal") -- gold "Reagents:"
     self.boxLabel:SetPoint("TOPLEFT", BOX_PAD, -BOX_PAD)
-    self.boxLabel:SetWidth(ROW_W) -- long labels wrap inside the box
+    self.boxLabel:SetWidth(ROW_W)
 
     self.summary = NewText(f, "GameFontHighlightSmall")
-    self.summary:SetPoint("BOTTOMLEFT", PAD, PAD)
+    self.summary:SetPoint("BOTTOMLEFT", 12, 8)
 
-    -- Footer buttons
+    -- Bottom bar buttons
     local function MakeButton(label, width, onClick)
         local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
         b:SetSize(width, 22)
@@ -328,30 +329,58 @@ function UI:Build()
     end
     local function Browse(delta)
         local prof = Prof()
-        local skill = ns.GetSkill(prof)
-        local index = (ns.state.viewIndex or ns.CurrentStepIndex(prof, skill)) + delta
+        local index = (ns.state.viewIndex or ns.CurrentStepIndex(prof, (ns.GetSkill(prof)))) + delta
         ns.state.viewIndex = math.max(1, math.min(#prof.steps, index))
         UI:Refresh()
     end
-    self.prevBtn = MakeButton("< Prev", 78, function() Browse(-1) end)
-    self.prevBtn:SetPoint("BOTTOMLEFT", PAD, PAD)
-    self.nextBtn = MakeButton("Next >", 78, function() Browse(1) end)
-    self.nextBtn:SetPoint("BOTTOMRIGHT", -PAD, PAD)
+    self.prevBtn = MakeButton("< Prev", 80, function() Browse(-1) end)
+    self.prevBtn:SetPoint("BOTTOMLEFT", 6, 3)
+    self.nextBtn = MakeButton("Next >", 80, function() Browse(1) end)
+    self.nextBtn:SetPoint("BOTTOMRIGHT", -8, 3)
     self.currentBtn = MakeButton("My step", 90, function()
         ns.state.viewIndex = nil
         UI:Refresh()
     end)
-    self.currentBtn:SetPoint("BOTTOM", 0, PAD)
+    self.currentBtn:SetPoint("BOTTOM", 0, 3)
 
-    f:HookScript("OnHide", function() UI.menu:Hide() end)
+    self:BuildPanelTabs()
+    self.profTabs = {}
+
     f:SetShown(ProfGuideForeverDB.shown)
     self:Refresh()
 end
 
--- ---------- Fast / Budget toggle ----------
--- A small two-option switch (a "segmented control") on the tab row.
--- Only shown for professions that have a budget route.
+-- ---------- Tabs under the window: This step / Shopping list ----------
+function UI:BuildPanelTabs()
+    local f = self.frame
+    local labels = { "This step", "Shopping list" }
+    local keys = { "step", "shop" }
+    self.panelTabs = {}
+    f.Tabs = {}
+    for i, label in ipairs(labels) do
+        local tab = TryCreate("Button", "ProfGuideForeverFrameTab" .. i, f, "PanelTabButtonTemplate")
+            or CreateFrame("Button", "ProfGuideForeverFrameTab" .. i, f, "UIPanelButtonTemplate")
+        tab:SetID(i)
+        tab:SetText(label)
+        if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, 0) end
+        if tab:GetWidth() < 60 then tab:SetSize(100, 24) end
+        if i == 1 then
+            tab:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 11, 2)
+        else
+            tab:SetPoint("LEFT", self.panelTabs[i - 1], "RIGHT", 3, 0)
+        end
+        tab:SetScript("OnClick", function()
+            ns.state.tab = keys[i]
+            if PlaySound and SOUNDKIT then pcall(PlaySound, SOUNDKIT.IG_CHARACTER_INFO_TAB) end
+            UI:Refresh()
+        end)
+        self.panelTabs[i] = tab
+        f.Tabs[i] = tab
+    end
+    if PanelTemplates_SetNumTabs then pcall(PanelTemplates_SetNumTabs, f, #labels) end
+end
 
+-- ---------- Fast / Budget switch ----------
 local ROUTE_HELP = {
     fast = "Fewest crafts. Some steps use pricier materials (gems, elixirs, scorpid scales).",
     budget = "Cheaper, common materials. A few more crafts.",
@@ -359,20 +388,25 @@ local ROUTE_HELP = {
 
 function UI:BuildRouteToggle()
     local wrap = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
-    wrap:SetSize(100, 20)
-    wrap:SetPoint("TOPRIGHT", -PAD, -55)
-    wrap:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-    wrap:SetBackdropBorderColor(1, 1, 1, 0.15)
+    wrap:SetSize(104, 20)
+    wrap:SetPoint("TOPRIGHT", -10, -28)
+    wrap:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    wrap:SetBackdropColor(0, 0, 0, 0.6)
+    wrap:SetBackdropBorderColor(0.75, 0.6, 0.35, 1)
     self.routeToggle = wrap
     self.routeButtons = {}
 
     for i, key in ipairs({ "fast", "budget" }) do
         local b = CreateFrame("Button", nil, wrap)
-        b:SetSize(49, 18)
-        b:SetPoint("LEFT", 1 + (i - 1) * 49, 0)
+        b:SetSize(48, 14)
+        b:SetPoint("LEFT", 4 + (i - 1) * 48, 0)
         b.fill = b:CreateTexture(nil, "BACKGROUND")
         b.fill:SetAllPoints()
-        b.fill:SetColorTexture(1, 1, 1, 0.14)
+        b.fill:SetColorTexture(1, 0.82, 0, 0.25) -- gold tint when selected
         b.text = NewText(b, "GameFontHighlightSmall", "CENTER")
         b.text:SetPoint("CENTER")
         b.text:SetText(key == "fast" and "Fast" or "Budget")
@@ -392,113 +426,71 @@ function UI:BuildRouteToggle()
     end
 end
 
--- ---------- Profession menu ----------
--- A small dropdown: your professions first (with skill), then the rest.
+-- ---------- Profession tabs down the right edge ----------
+-- Icon tabs like the classic spellbook. Only your professions.
+function UI:ProfTab(i)
+    if self.profTabs[i] then return self.profTabs[i] end
+    local t = CreateFrame("CheckButton", nil, self.frame)
+    t:SetSize(32, 32)
+    t:SetPoint("TOPLEFT", self.frame, "TOPRIGHT", 0, -50 - (i - 1) * 46)
 
-local MENU_W, ITEM_H = 236, 22
+    -- The tab shape behind the icon (spellbook side tab art).
+    t.bg = t:CreateTexture(nil, "BACKGROUND")
+    t.bg:SetSize(64, 64)
+    t.bg:SetPoint("TOPLEFT", -3, 11)
+    t.bg:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
 
-function UI:BuildMenu()
-    local m = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
-    m:SetFrameStrata("DIALOG") -- draws above everything else
-    m:SetWidth(MENU_W)
-    m:SetPoint("TOPLEFT", self.picker, "BOTTOMLEFT", -6, -6)
-    m:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    m:SetBackdropColor(0.09, 0.09, 0.10, 0.98)
-    m:SetBackdropBorderColor(0.35, 0.27, 0.18, 1)
-    m:EnableMouse(true) -- clicks on the menu don't fall through to the panel
-    m:Hide()
-    self.menu = m
-    self.menuItems, self.menuHeaders = {}, {}
-end
+    t.icon = t:CreateTexture(nil, "ARTWORK")
+    t.icon:SetAllPoints()
+    t:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    -- Selected glow: our own texture, so we control its blend mode.
+    local checked = t:CreateTexture(nil, "OVERLAY")
+    checked:SetAllPoints()
+    checked:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+    checked:SetBlendMode("ADD")
+    t:SetCheckedTexture(checked)
 
-local function MenuItem(self, i)
-    if self.menuItems[i] then return self.menuItems[i] end
-    local b = CreateFrame("Button", nil, self.menu)
-    b:SetSize(MENU_W - 12, ITEM_H)
-    b:SetHighlightTexture("Interface\\Buttons\\WHITE8x8")
-    b:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.08)
-    b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetSize(16, 16)
-    b.icon:SetPoint("LEFT", 6, 0)
-    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    b.label = NewText(b, "GameFontHighlight")
-    b.label:SetPoint("LEFT", b.icon, "RIGHT", 8, 0)
-    b.skill = NewText(b, "GameFontHighlightSmall", "RIGHT")
-    b.skill:SetPoint("RIGHT", -6, 0)
-    b.skill:SetTextColor(unpack(COLOR_MUTED))
-    b:SetScript("OnClick", function(btn)
+    t:SetScript("OnClick", function(btn)
         ns.state.prof = btn.profName
         ns.state.viewIndex = nil
         ProfGuideForeverDB.lastProf = btn.profName
-        UI.menu:Hide()
         UI:Refresh()
     end)
-    self.menuItems[i] = b
-    return b
+    t:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(btn.profName, 1, 0.82, 0)
+        if btn.rank then GameTooltip:AddLine(btn.rank .. " / " .. btn.max, 1, 1, 1) end
+        GameTooltip:Show()
+    end)
+    t:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.profTabs[i] = t
+    return t
 end
 
-local function MenuHeader(self, i)
-    if self.menuHeaders[i] then return self.menuHeaders[i] end
-    local fs = NewText(self.menu, "GameFontDisableSmall")
-    self.menuHeaders[i] = fs
-    return fs
-end
-
-function UI:ToggleMenu()
-    if self.menu:IsShown() then self.menu:Hide(); return end
-
-    -- Split into "yours" and "everything else".
+-- Shows a tab for each profession you have; keeps the panel on one of them.
+function UI:UpdateProfTabs()
     local learned = ns.LearnedProfessions()
-    local isLearned = {}
-    for _, p in ipairs(learned) do isLearned[p.name] = p end
-    local others = {}
-    for _, name in ipairs(ns.ProfessionOrder) do
-        if not isLearned[name] then table.insert(others, { name = name }) end
+    local current = ns.state.prof
+    local valid = false
+    for _, p in ipairs(learned) do if p.name == current then valid = true end end
+    if not valid and learned[1] then
+        ns.state.prof = learned[1].name
+        ns.state.viewIndex = nil
     end
-
-    local sections = {}
-    if #learned > 0 then table.insert(sections, { "YOUR PROFESSIONS", learned }) end
-    if #others > 0 then table.insert(sections, { #learned > 0 and "OTHER PROFESSIONS" or "PROFESSIONS", others }) end
-
-    local y, itemCount = -8, 0
-    for h, section in ipairs(sections) do
-        local header = MenuHeader(self, h)
-        header:ClearAllPoints()
-        header:SetPoint("TOPLEFT", 12, y)
-        header:SetText(section[1])
-        header:Show()
-        y = y - header:GetStringHeight() - 4
-
-        for _, p in ipairs(section[2]) do
-            itemCount = itemCount + 1
-            local b = MenuItem(self, itemCount)
-            b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", 6, y)
-            b.profName = p.name
-            b.icon:SetTexture(ns.Professions[p.name].icon)
-            b.label:SetText(p.name)
-            -- Current profession in gold, others white.
-            if p.name == Prof().name then b.label:SetTextColor(1, 0.82, 0) else b.label:SetTextColor(1, 1, 1) end
-            b.skill:SetText(p.rank and (p.rank .. " / " .. p.max) or "")
-            b:Show()
-            y = y - ITEM_H
-        end
-        y = y - 8 -- gap between sections
+    for i, p in ipairs(learned) do
+        local t = self:ProfTab(i)
+        t.profName, t.rank, t.max = p.name, p.rank, p.max
+        t.icon:SetTexture(ns.Professions[p.name].icon)
+        t:SetChecked(p.name == ns.state.prof)
+        t:Show()
     end
-    for i = itemCount + 1, #self.menuItems do self.menuItems[i]:Hide() end
-    for i = #sections + 1, #self.menuHeaders do self.menuHeaders[i]:Hide() end
-
-    self.menu:SetHeight(-y)
-    self.menu:Show()
+    for i = #learned + 1, #self.profTabs do self.profTabs[i]:Hide() end
+    return #learned > 0
 end
 
 -- ---------- Drawing (runs whenever something changes) ----------
 -- Refresh runs Draw "safely": if anything breaks, the error is
--- printed in your chat window instead of failing silently.
+-- printed in chat instead of failing silently.
 local lastError
 function UI:Refresh()
     if not self.frame then return end
@@ -509,15 +501,38 @@ function UI:Refresh()
     end
 end
 
+local function HideContent(self)
+    self.eyebrow:Hide(); self.recipe:Hide(); self.meta:Hide(); self.note:Hide()
+    self.trainerBtn:Hide(); self.openBtn:Hide(); self.box:Hide(); self.empty:Hide()
+    self.prevBtn:Hide(); self.nextBtn:Hide(); self.currentBtn:Hide(); self.summary:Hide()
+    for _, r in ipairs(self.rows) do r:Hide() end
+end
+
 function UI:Draw()
-    local prof = Prof()
+    local f = self.frame
+    local hasAny = self:UpdateProfTabs()
+
+    -- Empty state: this character has no professions yet.
+    if not hasAny then
+        HideContent(self)
+        f:SetTitle("ProfGuide Forever")
+        if f.SetPortraitToAsset then pcall(f.SetPortraitToAsset, f, "Interface\\AddOns\\ProfGuideForever\\Media\\MinimapIcon") end
+        self.skillText:SetText("")
+        self.bar:SetValue(0)
+        self.routeToggle:Hide()
+        Place(self.empty, -INSET_TOP - 30)
+        self.empty:SetText("You haven't learned a profession yet.\n\nVisit a profession trainer in any major city, then come back here for your levelling guide.")
+        f:SetHeight(INSET_TOP + 30 + self.empty:GetStringHeight() + 30 + INSET_BOTTOM)
+        return
+    end
+
+    local prof, def = ns.ActiveProf()
     local skill, maxSkill = ns.GetSkill(prof)
     local current = ns.CurrentStepIndex(prof, skill)
 
-    -- Header: icon + name; size the picker to fit so the arrow hugs the text
-    self.profIcon:SetTexture(prof.icon)
-    self.title:SetText(prof.name)
-    self.picker:SetWidth(18 + 6 + self.title:GetStringWidth() + 6 + 12)
+    -- Header: title, portrait, skill bar
+    f:SetTitle(prof.name)
+    if f.SetPortraitToAsset then pcall(f.SetPortraitToAsset, f, prof.icon) end
     if skill then
         self.skillText:SetText(skill .. " / " .. maxSkill)
         self.bar:SetValue(skill)
@@ -526,57 +541,53 @@ function UI:Draw()
         self.bar:SetValue(0)
     end
 
-    -- Tab styling: active = white + underline, inactive = grey
-    local onStep = (ns.state.tab == "step")
-    self.tabStep.line:SetShown(onStep)
-    self.tabShop.line:SetShown(not onStep)
-    self.tabStep.text:SetTextColor(unpack(onStep and { 1, 1, 1 } or COLOR_MUTED))
-    self.tabShop.text:SetTextColor(unpack(onStep and COLOR_MUTED or { 1, 1, 1 }))
-
-    -- Route toggle: only for professions with more than one route.
-    local _, def = ns.ActiveProf()
+    -- Route switch: only for professions with more than one route.
     self.routeToggle:SetShown(def.views.budget ~= nil)
     for key, b in pairs(self.routeButtons) do
         local on = (key == prof.routeKey)
-        b.fill:SetShown(on) -- selected = filled
-        b.text:SetTextColor(unpack(on and { 1, 1, 1 } or COLOR_MUTED))
+        b.fill:SetShown(on)
+        b.text:SetTextColor(unpack(on and WHITE or COLOR_MUTED))
     end
 
-    local y = -88 -- content starts under the tabs
+    -- Bottom tabs
+    local onStep = (ns.state.tab == "step")
+    if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, f, onStep and 1 or 2) end
+
+    HideContent(self)
+    local y = -INSET_TOP - 10
 
     if onStep then
-        local index = ns.state.viewIndex or current
+        -- Clamp, in case you browsed a longer route or profession.
+        local index = math.min(ns.state.viewIndex or current, #prof.steps)
         local step = prof.steps[index]
         local mats, crafts, verified = ns.StepMaterials(prof, step, skill)
 
-        local label = "STEP " .. index .. " OF " .. #prof.steps
-            .. "   SKILL " .. step.from .. "-" .. step.to
+        local label = "STEP " .. index .. " OF " .. #prof.steps .. "   SKILL " .. step.from .. "-" .. step.to
         if index ~= current then label = label .. "   (browsing)" end
-
         Place(self.eyebrow, y); self.eyebrow:SetText(label)
         y = y - self.eyebrow:GetStringHeight() - GAP_ABOVE_RECIPE
 
-        -- Recipe block: name + "Make about..." grouped tightly together
-        Place(self.recipe, y); self.recipe:SetText(step.recipe)
-        y = y - self.recipe:GetStringHeight() - GAP_IN_RECIPE
+        -- Recipe name with the "Open recipe" button beside it.
+        Place(self.recipe, y, INNER_W - OPEN_W - 8); self.recipe:SetText(step.recipe)
+        self.openBtn:ClearAllPoints()
+        self.openBtn:SetPoint("TOPRIGHT", f, "TOPLEFT", PAD + INNER_W, y + 2)
+        self.openBtn:SetEnabled(skill ~= nil) -- only for your own professions
+        self.openBtn:Show()
+        y = y - math.max(self.recipe:GetStringHeight(), 18) - GAP_IN_RECIPE
 
-        Place(self.meta, y)
         local meta = "Make about " .. crafts .. ".  Learn from: " .. step.source
-        -- Second line: status labels (only the ones that apply).
         local known = ns.IsKnown(step.recipe)
         local status = {}
         if known == false then table.insert(status, "|cffff9933Not learned yet|r") end
         if verified then table.insert(status, "|cff66d977Materials checked in game|r") end
         if #status > 0 then meta = meta .. "\n" .. table.concat(status, "    ") end
-        self.meta:SetText(meta)
+        Place(self.meta, y); self.meta:SetText(meta)
         self.meta:SetTextColor(unpack(COLOR_MUTED))
         y = y - self.meta:GetStringHeight()
 
-        -- Nearest trainer: when you haven't learned the profession, the
-        -- recipe, or you need to train your next rank.
+        -- Nearest trainer: profession or recipe not learned, or a rank due.
         local rankTips, capped = ns.RankTips(prof, step, skill, maxSkill)
-        local isCurrent = (index == current)
-        local needRank = isCurrent and (capped or #rankTips > 0)
+        local needRank = (index == current) and (capped or #rankTips > 0)
         local needRecipe = (known == false and step.source == "Trainer")
         local trainers = {}
         if (skill == nil or needRank or needRecipe) and ns.Finder then
@@ -592,17 +603,14 @@ function UI:Draw()
                 .. (dist ~= "" and ("  |cff9d9d9d(" .. dist .. ")|r") or ""))
             y = y - 6
             self.trainerBtn:ClearAllPoints()
-            self.trainerBtn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", PAD, y)
+            self.trainerBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
             self.trainerBtn:SetHeight(self.trainerBtn.text:GetStringHeight())
             self.trainerBtn:Show()
             y = y - self.trainerBtn.text:GetStringHeight()
-        else
-            self.trainerBtn:Hide()
         end
         y = y - GAP_BELOW_RECIPE
 
-        -- Tips: the step's own note, rank training reminders, and a
-        -- warning if you've hit your skill cap.
+        -- Tips
         local lines = {}
         if step.note then table.insert(lines, "Tip: " .. step.note) end
         for _, t in ipairs(rankTips) do table.insert(lines, t) end
@@ -612,32 +620,23 @@ function UI:Draw()
         if #lines > 0 then
             Place(self.note, y); self.note:SetText(table.concat(lines, "\n"))
             y = y - self.note:GetStringHeight() - 12
-        else
-            self.note:Hide()
         end
 
-        y = self:FillBox("MATERIALS", mats, y, "You craft this in an earlier step.")
+        y = self:FillBox("Reagents:", mats, y, "You craft this in an earlier step.")
 
         self.prevBtn:Show(); self.nextBtn:Show(); self.currentBtn:Show()
         self.prevBtn:SetEnabled(index > 1)
         self.nextBtn:SetEnabled(index < #prof.steps)
         self.currentBtn:SetEnabled(index ~= current)
-        self.summary:Hide()
-
-        self.frame:SetHeight(-y + 14 + 22 + PAD)
     else
         local list = ns.ShoppingList(prof, skill)
-
-        self.eyebrow:Hide(); self.recipe:Hide(); self.meta:Hide(); self.note:Hide(); self.trainerBtn:Hide()
-
-        local label = (#list > 0) and "EVERYTHING TO GATHER OR BUY FROM HERE TO 300" or "NOTHING LEFT TO GET. NICE WORK!"
-        -- Long lists get cut to the biggest items so the panel stays a sensible height.
         local MAX_ROWS = 15
         local shown = list
         if #list > MAX_ROWS then
             shown = {}
             for k = 1, MAX_ROWS do shown[k] = list[k] end
         end
+        local label = (#list > 0) and "Everything to gather or buy from here to 300:" or "Nothing left to get. Nice work!"
         y = self:FillBox(label, shown, y)
 
         local ready = 0
@@ -649,10 +648,9 @@ function UI:Draw()
         self.summary:SetText(summary)
         self.summary:SetTextColor(unpack(COLOR_MUTED))
         self.summary:Show()
-        self.prevBtn:Hide(); self.nextBtn:Hide(); self.currentBtn:Hide()
-
-        self.frame:SetHeight(-y + 12 + 14 + PAD)
     end
+
+    f:SetHeight(-y + 12 + INSET_BOTTOM)
 end
 
 -- Show/hide. Pass true/false, or nothing to flip it.

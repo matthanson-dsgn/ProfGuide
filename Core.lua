@@ -96,6 +96,7 @@ local function InitDB()
     db.skills  = db.skills or {}    -- character -> profession -> { skill, max }
     db.routes  = db.routes or {}    -- profession -> "fast" or "budget"
     db.known   = db.known or {}     -- character -> recipe name -> learned? (true/false)
+    db.recipeIDs = db.recipeIDs or {} -- recipe name -> the game's recipe ID (for "Open recipe")
 end
 
 -- This character's part of a saved table (e.g. "skills"), created on demand.
@@ -270,6 +271,7 @@ local function ScanModern()
             report.matched = report.matched + 1
             local known = CharTable("known")
             if known then known[info.name] = info.learned and true or false end
+            ProfGuideForeverDB.recipeIDs[info.name] = recipeID
             local schematic = T.GetRecipeSchematic(recipeID, false)
             local mats, complete = {}, true
             for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
@@ -469,6 +471,35 @@ function ns.RankTips(prof, step, skill, maxSkill)
     return tips, capped
 end
 
+-- ---------- Opening a recipe in the profession window ----------
+
+-- Opens your profession window on a step's recipe. Uses the recipe's
+-- ID if we've seen it; otherwise opens the profession and types the
+-- recipe name into its search box.
+function ns.OpenRecipe(prof, step)
+    local T = C_TradeSkillUI
+    if InCombatLockdown and InCombatLockdown() then
+        print("|cffffd100ProfGuide Forever:|r can't open the profession window during combat.")
+        return
+    end
+    local id = ProfGuideForeverDB.recipeIDs[step.recipe]
+    if id and T and T.OpenRecipe then
+        if pcall(T.OpenRecipe, id) then return end
+    end
+    -- Fallback: open the profession, then search for the recipe by name.
+    if T and T.OpenTradeSkill then
+        pcall(T.OpenTradeSkill, prof.skillLine)
+    elseif CastSpellByName then
+        pcall(CastSpellByName, prof.name)
+    end
+    C_Timer.After(0.4, function()
+        pcall(function()
+            local box = ProfessionsFrame.CraftingPage.RecipeList.SearchBox
+            box:SetText(step.recipe)
+        end)
+    end)
+end
+
 -- ---------- /pg check ----------
 -- Lists which materials the add-on recognises, and anything that
 -- doesn't match the game, so problems are easy to report.
@@ -599,13 +630,7 @@ events:SetScript("OnEvent", function(self, event, arg1)
     if event == "PLAYER_LOGIN" then
         pcall(ScanBags)
         -- Open on the profession you last viewed, or your first one.
-        local last = ProfGuideForeverDB.lastProf
-        if last and ns.Professions[last] then
-            ns.state.prof = last
-        else
-            local learned = ns.LearnedProfessions()
-            ns.state.prof = learned[1] and learned[1].name or ns.ProfessionOrder[1]
-        end
+        ns.state.prof = ProfGuideForeverDB.lastProf -- the UI swaps it if this character doesn't have it
         if ns.UI then ns.UI:Build() end
         if ns.Minimap then ns.Minimap:Build() end
         return

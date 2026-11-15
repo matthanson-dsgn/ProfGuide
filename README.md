@@ -9,12 +9,13 @@ An in-game profession levelling guide for **World of Warcraft: Forever**. Stop t
 - Lets you browse ahead or back with Prev / Next.
 - You can drag the panel anywhere; it remembers its position.
 - A minimap button opens and closes the panel.
+- "Open recipe" jumps straight to the step's recipe in your profession window.
 - Shows which recipes you haven't learned yet, and your nearest trainer (click to open the map).
 
 ## Professions
 All crafting professions from 1 to 300: Alchemy, Blacksmithing, Enchanting, Engineering, Leatherworking and Tailoring, plus Cooking and First Aid.
 
-Pick a profession from the dropdown in the panel's header. Your character's professions are listed first.
+Switch professions with the icon tabs on the right edge of the window. Only your character's professions are shown.
 
 ## Fast or Budget
 Leatherworking has two routes. Switch between them with the **Fast | Budget** toggle on the panel:
