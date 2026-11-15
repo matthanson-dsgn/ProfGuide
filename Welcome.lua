@@ -90,6 +90,7 @@ local function Build()
         local indent = (kind == "item") and 14 or 0
         fs:SetPoint("TOPLEFT", 24 + indent, y)
         fs:SetWidth(TEXT_W - indent)
+        fs:SetSpacing(kind == "head" and 0 or 4) -- extra line height for body text
         fs:SetText(text)
         if kind == "item" then
             -- Small gold dash as the bullet.
@@ -97,7 +98,7 @@ local function Build()
             dash:SetPoint("TOPRIGHT", fs, "TOPLEFT", -5, 0)
             dash:SetText("-")
         end
-        y = y - fs:GetStringHeight() - ((kind == "head") and 6 or 6)
+        y = y - fs:GetStringHeight() - ((kind == "head") and 8 or 8)
         prevKind = kind
     end
 
